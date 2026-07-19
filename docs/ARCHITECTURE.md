@@ -45,9 +45,15 @@
 - `roadmap_steps`: ordered, unlockable roadmap milestones
 - `coach_messages`: course-grounded questions, answers, actions, and evidence
 
+### Phase 5 tables — provisioned
+
+- `ai_jobs`: private status, progress, stage, model, token totals, duration, retries, and failure metadata for long-running AI work
+- `notifications`: private study reminders plus AI completion and failure activity
+- `reminder_preferences`: one private in-app schedule and quiet-hours record per learner
+
 ### Planned tables
 
-`course_members`, `lectures`, `concept_relationships`, `study_sessions`, `assessments`, `ai_jobs`, and `notifications`.
+`course_members`, `lectures`, `concept_relationships`, `study_sessions`, and `assessments`.
 
 ### Storage
 
@@ -66,9 +72,14 @@
 - `detect-gaps`: implemented as the `detect_gaps` action with explicit evidence and missing-evidence handling
 - `ask-coach`: implemented as the `ask_coach` action grounded in profile, course, concepts, gaps, plan, materials, and roadmap
 - `update-mastery`: implemented as the `submit_attempt` action
-- `deepseek-gateway`: the learning engine currently owns validated JSON model access; shared logging, retries, and cost controls harden in Phase 5
+- `sync-reminders`: implemented as the `sync_reminders` action, translating planned tasks into private scheduled in-app notifications
+- `deepseek-gateway`: the learning engine owns normalized JSON model access, one bounded retry for transient failures, token accounting, structured operational logs, and a configurable daily request limit
 
-Long-running AI actions are submitted asynchronously. The browser polls the user-owned result records rather than relying on Appwrite's 30-second synchronous execution response window.
+Long-running AI actions create a user-owned `ai_jobs` row before execution. The browser subscribes to that exact row with Appwrite Realtime and retains a polling fallback. The function advances the job through queued, processing, reasoning, persistence, completed, or failed states, then emits a private notification. Operational records exclude prompt, submission, and response content.
+
+### Messaging boundary
+
+In-app reminders and activity are live. Email delivery remains off until an Appwrite email provider and verified sender are configured; the interface labels this state instead of implying that email is being sent.
 
 ## Retrieval approach
 

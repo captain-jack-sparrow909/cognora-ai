@@ -20,6 +20,7 @@ const required = [
   "DEEPSEEK_BASE_URL",
   "DEEPSEEK_FAST_MODEL",
   "DEEPSEEK_REASONING_MODEL",
+  "AI_DAILY_REQUEST_LIMIT",
 ];
 for (const key of required) if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
 
@@ -67,6 +68,7 @@ const variables = [
   ["deepseek_base", "DEEPSEEK_BASE_URL", process.env.DEEPSEEK_BASE_URL, false],
   ["deepseek_fast", "DEEPSEEK_FAST_MODEL", process.env.DEEPSEEK_FAST_MODEL, false],
   ["deepseek_reasoning", "DEEPSEEK_REASONING_MODEL", process.env.DEEPSEEK_REASONING_MODEL, false],
+  ["ai_daily_limit", "AI_DAILY_REQUEST_LIMIT", process.env.AI_DAILY_REQUEST_LIMIT, false],
 ];
 const existing = await functions.listVariables({ functionId, total: false });
 for (const [variableId, key, value, secret] of variables) {

@@ -381,6 +381,72 @@ const definitions = [
       { key: "course_created", type: TablesDBIndexType.Key, columns: ["courseId", "createdAt"] },
     ],
   },
+  {
+    id: "ai_jobs",
+    name: "AI job operations",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: false },
+      { key: "entityId", type: "varchar", size: 36, required: false },
+      { key: "action", type: "varchar", size: 48, required: true },
+      { key: "label", type: "varchar", size: 160, required: true },
+      { key: "status", type: "enum", elements: ["queued", "processing", "completed", "failed"], required: true },
+      { key: "progress", type: "integer", min: 0, max: 100, required: true },
+      { key: "stage", type: "varchar", size: 160, required: true },
+      { key: "model", type: "varchar", size: 64, required: false },
+      { key: "inputChars", type: "integer", min: 0, max: 2000000, required: false },
+      { key: "promptTokens", type: "integer", min: 0, max: 10000000, required: false },
+      { key: "completionTokens", type: "integer", min: 0, max: 10000000, required: false },
+      { key: "durationMs", type: "integer", min: 0, max: 3600000, required: false },
+      { key: "retryCount", type: "integer", min: 0, max: 10, required: false },
+      { key: "error", type: "text", required: false },
+      { key: "createdAt", type: "datetime", required: true },
+      { key: "startedAt", type: "datetime", required: false },
+      { key: "completedAt", type: "datetime", required: false },
+    ],
+    indexes: [
+      { key: "owner_created", type: TablesDBIndexType.Key, columns: ["ownerId", "createdAt"] },
+      { key: "owner_status", type: TablesDBIndexType.Key, columns: ["ownerId", "status"] },
+    ],
+  },
+  {
+    id: "notifications",
+    name: "Learner notifications",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "type", type: "enum", elements: ["reminder", "ai-complete", "ai-failed", "insight"], required: true },
+      { key: "title", type: "varchar", size: 180, required: true },
+      { key: "body", type: "text", required: true },
+      { key: "entityType", type: "varchar", size: 48, required: false },
+      { key: "entityId", type: "varchar", size: 36, required: false },
+      { key: "read", type: "boolean", required: false, default: false },
+      { key: "scheduledFor", type: "datetime", required: false },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_read", type: TablesDBIndexType.Key, columns: ["ownerId", "read"] },
+      { key: "owner_schedule", type: TablesDBIndexType.Key, columns: ["ownerId", "scheduledFor"] },
+    ],
+  },
+  {
+    id: "reminder_preferences",
+    name: "Reminder preferences",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "inAppEnabled", type: "boolean", required: false, default: true },
+      { key: "emailEnabled", type: "boolean", required: false, default: false },
+      { key: "dailyTime", type: "varchar", size: 5, required: true },
+      { key: "daysJson", type: "text", required: true },
+      { key: "timezone", type: "varchar", size: 64, required: true },
+      { key: "taskLeadMinutes", type: "integer", min: 5, max: 1440, required: true },
+      { key: "quietStart", type: "varchar", size: 5, required: false },
+      { key: "quietEnd", type: "varchar", size: 5, required: false },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] },
+    ],
+  },
 ];
 
 function isNotFound(error) {
@@ -583,4 +649,4 @@ try {
 }
 
 console.log("Secured bucket: course-materials");
-console.log("Appwrite Phase 4 resources are ready.");
+console.log("Appwrite Phase 5 resources are ready.");

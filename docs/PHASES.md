@@ -37,9 +37,19 @@ Delivered with a private Appwrite Function backed by DeepSeek V4 Flash, document
 
 Delivered with private assignment submissions, rubric-linked advisory feedback, evidence-aware gap analysis, prerequisite-aware adaptive roadmaps, and a course-grounded DeepSeek coach. Long-running reasoning uses asynchronous Appwrite executions and persisted-result polling so work can safely exceed the synchronous response window.
 
-## Phase 5 — Engagement and production readiness
+## Phase 5 — Engagement and production readiness ✅
 
 - Messaging and reminders
 - Realtime AI job progress
 - Accessibility and performance review
 - End-to-end tests, observability, cost controls, and deployment hardening
+
+Delivered with private in-app reminders, realtime AI job progress, completion/failure notifications, token and runtime telemetry, bounded retries, a server-enforced daily request limit, accessible navigation and live regions, reduced-motion support, lazy-loaded workspaces, contract tests, and a full temporary-user Appwrite/DeepSeek smoke test. Email delivery is intentionally disabled until an Appwrite email provider and sender are configured.
+
+## Phase 6 — Beta growth and integrations
+
+- Connect an Appwrite email provider and verified sender
+- Calendar export and optional Google/Outlook sync
+- Product analytics, user feedback, and beta cohort tooling
+- Semantic retrieval for large multi-course libraries
+- Native mobile or installable PWA experience

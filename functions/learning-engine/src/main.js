@@ -94,28 +94,35 @@ async function extractText(buffer, filename, mimeType) {
   return ast.toText();
 }
 
-async function callDeepSeek({ system, prompt, model, maxTokens = 5000 }) {
+async function callDeepSeek({ services, system, prompt, model, maxTokens = 5000 }) {
   const endpoint = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
-  const response = await fetch(`${endpoint}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      thinking: { type: "disabled" },
-      messages: [
-        { role: "system", content: `${system}\nReturn one valid JSON object and no markdown.` },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: maxTokens,
-      temperature: 0.2,
-    }),
-  });
+  await services?.reportProgress?.(38, "DeepSeek is reasoning");
+  let response;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    response = await fetch(`${endpoint}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        thinking: { type: "disabled" },
+        messages: [
+          { role: "system", content: `${system}\nReturn one valid JSON object and no markdown.` },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: maxTokens,
+        temperature: 0.2,
+      }),
+    });
+    if (response.ok || (response.status < 500 && response.status !== 429)) break;
+    services.retryCount = attempt + 1;
+    await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+  }
 
-  if (!response.ok) {
+  if (!response?.ok) {
     const detail = await response.text();
     throw new Error(`DeepSeek request failed (${response.status}): ${detail.slice(0, 300)}`);
   }
@@ -123,7 +130,60 @@ async function callDeepSeek({ system, prompt, model, maxTokens = 5000 }) {
   const payload = await response.json();
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error("DeepSeek returned an empty response.");
+  services.usage = {
+    inputChars: prompt.length,
+    promptTokens: Number(payload.usage?.prompt_tokens || 0),
+    completionTokens: Number(payload.usage?.completion_tokens || 0),
+    model: payload.model || model,
+  };
+  await services?.reportProgress?.(74, "Saving grounded results");
   return { data: JSON.parse(content), model: payload.model || model };
+}
+
+async function createNotification(services, data) {
+  return services.tables.createRow({
+    databaseId: services.databaseId,
+    tableId: "notifications",
+    rowId: ID.unique(),
+    data: {
+      ownerId: services.userId,
+      read: false,
+      createdAt: new Date().toISOString(),
+      ...data,
+    },
+    permissions: userPermissions(services.userId),
+  });
+}
+
+async function syncReminders(services) {
+  const { tables, databaseId, userId } = services;
+  const preferences = await tables.listRows({ databaseId, tableId: "reminder_preferences", queries: [Query.equal("ownerId", [userId]), Query.limit(1)] });
+  const preference = preferences.rows[0];
+  if (!preference?.inAppEnabled) return { ok: true, created: 0 };
+  const now = new Date();
+  const horizon = new Date(now);
+  horizon.setDate(horizon.getDate() + 7);
+  const [tasks, existing] = await Promise.all([
+    tables.listRows({ databaseId, tableId: "study_tasks", queries: [Query.equal("ownerId", [userId]), Query.equal("status", ["planned"]), Query.greaterThanEqual("scheduledFor", [now.toISOString()]), Query.lessThanEqual("scheduledFor", [horizon.toISOString()]), Query.limit(100)] }),
+    tables.listRows({ databaseId, tableId: "notifications", queries: [Query.equal("ownerId", [userId]), Query.equal("type", ["reminder"]), Query.limit(100)] }),
+  ]);
+  const existingIds = new Set(existing.rows.map((notification) => notification.entityId));
+  let created = 0;
+  for (const task of tasks.rows) {
+    if (existingIds.has(task.$id)) continue;
+    const scheduledFor = new Date(task.scheduledFor);
+    scheduledFor.setMinutes(scheduledFor.getMinutes() - (preference.taskLeadMinutes || 30));
+    await createNotification(services, {
+      type: "reminder",
+      title: `Upcoming: ${task.title}`.slice(0, 180),
+      body: `${task.durationMinutes} minutes · ${task.reason || "Part of your adaptive study plan."}`.slice(0, 20_000),
+      entityType: "study_task",
+      entityId: task.$id,
+      scheduledFor: scheduledFor > now ? scheduledFor.toISOString() : now.toISOString(),
+    });
+    created += 1;
+  }
+  return { ok: true, created };
 }
 
 async function deleteRows(tables, databaseId, tableId, queries) {
@@ -152,6 +212,7 @@ async function processMaterial(services, body) {
     const source = extracted.slice(0, MAX_SOURCE_CHARS);
     const model = process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash";
     const { data, model: usedModel } = await callDeepSeek({
+      services,
       model,
       system: "You are Cognora's course-material analyst. Extract only what is supported by the supplied source. Build concise, student-ready outputs. Never invent deadlines, facts, or learning outcomes.",
       prompt: `Today is ${new Date().toISOString().slice(0, 10)}. Analyze this ${material.kind} named ${JSON.stringify(material.name)}.\n\nReturn this JSON shape:\n{\n  "title": "descriptive title",\n  "materialType": "syllabus|lecture|notes|assignment|transcript|other",\n  "summary": "3-6 paragraph grounded summary",\n  "outline": ["ordered section or lecture point"],\n  "keyPoints": ["high-value fact or idea"],\n  "concepts": [{"title":"concept", "description":"grounded explanation"}],\n  "flashcards": [{"front":"question or cue", "back":"answer", "concept":"matching concept title", "explanation":"why it matters"}],\n  "quiz": [{"question":"single-answer question", "options":["A","B","C","D"], "answer":"exact option text", "concept":"matching concept title", "explanation":"grounded explanation"}],\n  "studyTasks": [{"title":"task", "description":"what to do", "taskType":"review|practice|lecture|reading|project", "durationMinutes":30, "scheduledFor":"ISO date if explicitly supported or a sensible near-term date", "reason":"why this task follows from the material"}]\n}\n\nKeep at most 10 concepts, 10 flashcards, 8 quiz questions, and 8 tasks. Source:\n${source}`,
@@ -318,6 +379,7 @@ async function generatePlan(services, body) {
   const profile = profiles.rows[0];
   const model = process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash";
   const { data } = await callDeepSeek({
+    services,
     model,
     system: "You are Cognora's adaptive study planner. Create realistic study sessions from mastery evidence. Prioritize low-mastery concepts, balance cognitive load, and never schedule more time than the student's weekly availability.",
     prompt: `Create a seven-day plan starting ${new Date().toISOString().slice(0, 10)} for ${course.title}. Weekly availability: ${profile?.weeklyHours || 6} hours. Learning goal: ${profile?.learningGoal || "Build reliable course mastery"}. Concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Return {"tasks":[{"conceptId":"exact id", "title":"task", "description":"specific activity", "taskType":"review|practice|lecture|reading|project", "durationMinutes":30, "scheduledFor":"ISO date-time", "reason":"evidence-based reason"}]}. Return 4-8 tasks.`,
@@ -457,6 +519,7 @@ async function reviewAssignment(services, body) {
     if (extracted.length < 40) throw new Error("The submission did not contain enough extractable text.");
     const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
     const { data, model: usedModel } = await callDeepSeek({
+      services,
       model,
       system: "You are Cognora's assignment feedback coach. Give rigorous, constructive, rubric-linked feedback. Your score is advisory, never an official grade. Do not rewrite the student's submission. Quote no more than a short phrase when pointing to evidence.",
       prompt: `Review this student submission. Assignment title: ${assignment.title}. Brief: ${assignment.brief}. Rubric: ${assignment.rubricText}. Course concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, description: concept.description })))}. Return {"summary":"overall assessment", "advisoryScore":78, "strengths":["specific strength"], "improvements":[{"issue":"issue", "evidence":"brief evidence", "howToImprove":"action"}], "rubric":[{"criterion":"criterion", "level":"advisory level", "score":80, "feedback":"feedback"}], "nextSteps":["ordered revision action"], "linkedConcepts":[{"conceptId":"exact supplied id", "title":"concept title", "reason":"why it matters"}]}. Submission:\n${extracted.slice(0, MAX_SOURCE_CHARS)}`,
@@ -510,6 +573,7 @@ async function detectGaps(services, body) {
   if (concepts.rows.length === 0) throw new Error("Analyze course material before detecting knowledge gaps.");
   const model = process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash";
   const { data } = await callDeepSeek({
+    services,
     model,
     system: "You are Cognora's evidence-based knowledge gap detector. Separate missing evidence from demonstrated weakness. Never label a student weak solely because they have not attempted a concept. Explain every gap with the supplied evidence.",
     prompt: `Analyze gaps for ${course.title}. Concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, description: concept.description, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Mastery records: ${JSON.stringify(records.rows.map((record) => ({ conceptId: record.conceptId, mastery: record.mastery, evidenceCount: record.evidenceCount, correctCount: record.correctCount, lastEvidence: record.lastEvidence })))}. Recent attempts: ${JSON.stringify(attempts.rows.map((attempt) => ({ conceptId: attempt.conceptId, correct: attempt.correct, confidence: attempt.confidence, masteryAfter: attempt.masteryAfter })))}. Return {"gaps":[{"conceptId":"exact id", "title":"concept title", "severity":"high|medium|low", "evidence":["specific evidence or missing-evidence statement"], "explanation":"why this is a gap", "recommendedAction":"specific next learning action"}]}. Return at most 8, prioritizing demonstrated weakness, then low-evidence concepts.`,
@@ -569,6 +633,7 @@ async function generateRoadmap(services, body) {
   const profile = profileRows.rows[0];
   const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
   const { data, model: usedModel } = await callDeepSeek({
+    services,
     model,
     system: "You are Cognora's prerequisite-aware learning roadmap architect. Sequence foundations before dependent skills, adapt around evidence-backed gaps, and make every step achievable within the student's available time.",
     prompt: `Build a roadmap for ${course.title}. Goal: ${goal}. Weekly hours: ${profile?.weeklyHours || 6}. Concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, description: concept.description, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Current gaps: ${JSON.stringify(gaps.rows.map((gap) => ({ conceptId: gap.conceptId, severity: gap.severity, explanation: gap.explanation, recommendedAction: gap.recommendedAction })))}. Return {"title":"roadmap title", "summary":"how this path reaches the goal", "steps":[{"conceptId":"exact supplied id when relevant", "title":"milestone", "description":"specific outcome and activity", "targetDate":"ISO date", "reason":"prerequisite or evidence-based reason"}]}. Return 5-10 ordered steps.`,
@@ -642,6 +707,7 @@ async function askCoach(services, body) {
   ]);
   const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
   const { data, model: usedModel } = await callDeepSeek({
+    services,
     model,
     system: "You are Cognora, a calm and evidence-aware AI study coach. Answer directly, give actionable next steps, and explain which course evidence supports your advice. Clearly say when the available evidence is insufficient. Do not claim to change schedules or grades.",
     prompt: `Student profile: ${JSON.stringify(profiles.rows[0] || {})}. Selected course: ${JSON.stringify(course ? { id: course.$id, title: course.title, description: course.description, targetGrade: course.targetGrade } : null)}. Lowest-mastery concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ title: concept.title, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Gap insights: ${JSON.stringify(gaps.rows.map((gap) => ({ title: gap.title, severity: gap.severity, explanation: gap.explanation, recommendedAction: gap.recommendedAction })))}. Planned tasks: ${JSON.stringify(tasks.rows.map((task) => ({ title: task.title, scheduledFor: task.scheduledFor, durationMinutes: task.durationMinutes, reason: task.reason })))}. Material summaries: ${JSON.stringify(insights.rows.map((insight) => ({ title: insight.title, summary: insight.summary.slice(0, 1800) })))}. Active roadmaps: ${JSON.stringify(roadmaps.rows.map((roadmap) => ({ title: roadmap.title, goal: roadmap.goal, summary: roadmap.summary })))}. Student question: ${message}. Return {"answer":"clear coach response", "suggestedActions":["specific action"], "evidence":["course evidence used or an explicit insufficient-evidence note"]}.`,
@@ -673,12 +739,100 @@ async function askCoach(services, body) {
   };
 }
 
+async function prepareJob(services, body) {
+  const jobId = text(body.jobId);
+  if (!jobId) return;
+  const job = await services.tables.getRow({ databaseId: services.databaseId, tableId: "ai_jobs", rowId: jobId });
+  if (job.ownerId !== services.userId) throw new Error("This AI job does not belong to your account.");
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const recent = await services.tables.listRows({
+    databaseId: services.databaseId,
+    tableId: "ai_jobs",
+    queries: [Query.equal("ownerId", [services.userId]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(100)],
+    total: false,
+  });
+  const limit = clamp(process.env.AI_DAILY_REQUEST_LIMIT || 40, 1, 1000);
+  if (recent.rows.length > limit) {
+    await services.tables.updateRow({ databaseId: services.databaseId, tableId: "ai_jobs", rowId: jobId, data: { status: "failed", progress: 100, stage: "Daily limit reached", error: `Daily AI request limit reached (${limit}).`, completedAt: new Date().toISOString() } });
+    throw new Error(`Daily AI request limit reached (${limit}). Try again tomorrow.`);
+  }
+  services.job = job;
+  services.jobStartedAt = Date.now();
+  services.retryCount = 0;
+  services.reportProgress = async (progress, stage) => services.tables.updateRow({
+    databaseId: services.databaseId,
+    tableId: "ai_jobs",
+    rowId: jobId,
+    data: { progress: clamp(progress, 0, 99), stage: text(stage, "Working").slice(0, 160) },
+  });
+  await services.tables.updateRow({
+    databaseId: services.databaseId,
+    tableId: "ai_jobs",
+    rowId: jobId,
+    data: { status: "processing", progress: 10, stage: "Preparing private course context", startedAt: new Date().toISOString() },
+  });
+}
+
+async function completeJob(services) {
+  if (!services.job) return;
+  const completedAt = new Date().toISOString();
+  const usage = services.usage || {};
+  await services.tables.updateRow({
+    databaseId: services.databaseId,
+    tableId: "ai_jobs",
+    rowId: services.job.$id,
+    data: {
+      status: "completed",
+      progress: 100,
+      stage: "Ready",
+      model: usage.model,
+      inputChars: usage.inputChars || 0,
+      promptTokens: usage.promptTokens || 0,
+      completionTokens: usage.completionTokens || 0,
+      durationMs: Math.max(0, Date.now() - services.jobStartedAt),
+      retryCount: services.retryCount || 0,
+      completedAt,
+    },
+  });
+  await createNotification(services, {
+    type: "ai-complete",
+    title: `${services.job.label} is ready`.slice(0, 180),
+    body: "Cognora finished securely and saved the result in your workspace.",
+    entityType: "ai_job",
+    entityId: services.job.$id,
+    scheduledFor: completedAt,
+  });
+}
+
+async function failJob(services, caught) {
+  if (!services?.job) return;
+  const completedAt = new Date().toISOString();
+  const message = caught instanceof Error ? caught.message : "The AI job could not be completed.";
+  await services.tables.updateRow({
+    databaseId: services.databaseId,
+    tableId: "ai_jobs",
+    rowId: services.job.$id,
+    data: { status: "failed", progress: 100, stage: "Needs attention", error: message.slice(0, 20_000), durationMs: Math.max(0, Date.now() - services.jobStartedAt), retryCount: services.retryCount || 0, completedAt },
+  }).catch(() => undefined);
+  await createNotification(services, {
+    type: "ai-failed",
+    title: `${services.job.label} needs attention`.slice(0, 180),
+    body: "The request did not finish. Your existing learning data was preserved, and you can safely try again.",
+    entityType: "ai_job",
+    entityId: services.job.$id,
+    scheduledFor: completedAt,
+  }).catch(() => undefined);
+}
+
 async function main({ req, res, log, error }) {
+  let services;
   try {
     if (req.method !== "POST") return res.json({ ok: true, function: functionId }, 200);
-    const services = createUserServices(req);
+    services = createUserServices(req);
     const body = readJson(req.body);
-    log(`Learning engine action: ${body.action || "unknown"}`);
+    await prepareJob(services, body);
+    log(JSON.stringify({ event: "learning_action_started", action: body.action || "unknown", jobId: body.jobId || null }));
     let result;
     if (body.action === "process_material") result = await processMaterial(services, body);
     else if (body.action === "generate_plan") result = await generatePlan(services, body);
@@ -687,9 +841,14 @@ async function main({ req, res, log, error }) {
     else if (body.action === "detect_gaps") result = await detectGaps(services, body);
     else if (body.action === "generate_roadmap") result = await generateRoadmap(services, body);
     else if (body.action === "ask_coach") result = await askCoach(services, body);
+    else if (body.action === "sync_reminders") result = await syncReminders(services);
     else throw new Error("Unknown learning engine action.");
+    if (body.action === "generate_plan") await syncReminders(services).catch(() => undefined);
+    await completeJob(services);
+    log(JSON.stringify({ event: "learning_action_completed", action: body.action, jobId: body.jobId || null, durationMs: services.jobStartedAt ? Date.now() - services.jobStartedAt : 0 }));
     return res.json(result, 200);
   } catch (caught) {
+    await failJob(services, caught);
     error(caught instanceof Error ? caught.message : String(caught));
     return res.json({ ok: false, error: caught instanceof Error ? caught.message : "The learning engine could not complete this request." }, 400);
   }

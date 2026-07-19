@@ -20,7 +20,7 @@ test("server-renders the Cognora application shell", async () => {
   const html = await response.text();
   assert.match(html, /<title>Cognora AI/);
   assert.match(html, /Connecting your learning workspace/);
-  assert.match(html, /og-phase4\.png/);
+  assert.match(html, /og-phase5\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
@@ -30,8 +30,8 @@ test("keeps the finished product free of starter preview assets", async () => {
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /AssignmentsWorkspace|InsightsWorkspace|RoadmapsWorkspace|CoachWorkspace/);
-  assert.match(layout, /og-phase4\.png/);
+  assert.match(page, /ActivityCenter|SettingsWorkspace|Suspense/);
+  assert.match(layout, /og-phase5\.png/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });

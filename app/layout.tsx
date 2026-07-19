@@ -14,18 +14,18 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: "Cognora AI — Your learning, finally connected",
     description:
-      "Cognora AI turns course evidence into private feedback, explainable knowledge gaps, adaptive roadmaps, and grounded coaching.",
+      "A private AI learning workspace with realtime progress, study reminders, explainable guidance, and production-grade safeguards.",
     openGraph: {
       title: "Cognora AI",
-      description: "Evidence becomes direction.",
+      description: "Private by design. Ready in realtime.",
       type: "website",
-      images: [{ url: `${origin}/og-phase4.png`, width: 1536, height: 1024, alt: "Cognora AI connected intelligence loop" }],
+      images: [{ url: `${origin}/og-phase5.png`, width: 1536, height: 1024, alt: "Cognora AI private realtime learning operations" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Cognora AI",
-      description: "Evidence becomes direction.",
-      images: [`${origin}/og-phase4.png`],
+      description: "Private by design. Ready in realtime.",
+      images: [`${origin}/og-phase5.png`],
     },
   };
 }

@@ -1,7 +1,9 @@
 "use client";
 
-import { ExecutionMethod, Query } from "appwrite";
+import { Channel, ExecutionMethod, ID } from "appwrite";
 import { getAppwriteBrowserServices } from "./client";
+import type { AiJob } from "./models";
+import { privateUserPermissions } from "./permissions";
 
 type LearningAction =
   | { action: "process_material"; materialId: string }
@@ -10,43 +12,96 @@ type LearningAction =
   | { action: "review_assignment"; assignmentId: string }
   | { action: "detect_gaps"; courseId: string }
   | { action: "generate_roadmap"; courseId: string; goal: string }
-  | { action: "ask_coach"; courseId?: string; message: string };
+  | { action: "ask_coach"; courseId?: string; message: string }
+  | { action: "sync_reminders" };
+
+const jobLabels: Record<Exclude<LearningAction["action"], "submit_attempt" | "sync_reminders">, string> = {
+  process_material: "Analyzing course material",
+  generate_plan: "Building an adaptive plan",
+  review_assignment: "Reviewing an assignment",
+  detect_gaps: "Detecting knowledge gaps",
+  generate_roadmap: "Building a learning roadmap",
+  ask_coach: "Preparing coach guidance",
+};
+
+function announceJob(job: AiJob) {
+  window.dispatchEvent(new CustomEvent<AiJob>("cognora:ai-job", { detail: job }));
+}
+
+function jobContext(action: LearningAction) {
+  if (action.action === "process_material") return { entityId: action.materialId };
+  if (action.action === "review_assignment") return { entityId: action.assignmentId };
+  if ("courseId" in action) return { courseId: action.courseId || undefined };
+  return {};
+}
 
 export async function executeLearningAction<T>(action: LearningAction): Promise<T> {
-  const { functions, tables, config } = getAppwriteBrowserServices();
-  const runAsync = action.action !== "submit_attempt";
-  const startedAt = Date.now();
-  const execution = await functions.createExecution({
+  const { account, client, functions, tables, config } = getAppwriteBrowserServices();
+  const runAsync = action.action !== "submit_attempt" && action.action !== "sync_reminders";
+  let jobId: string | undefined;
+  let unsubscribe: (() => void) | undefined;
+  let requestBody: LearningAction & { jobId?: string } = action;
+
+  if (runAsync) {
+    const user = await account.get();
+    jobId = ID.unique();
+    const job = await tables.createRow<AiJob>({
+      databaseId: config.databaseId,
+      tableId: "ai_jobs",
+      rowId: jobId,
+      data: {
+        ownerId: user.$id,
+        ...jobContext(action),
+        action: action.action,
+        label: jobLabels[action.action],
+        status: "queued",
+        progress: 2,
+        stage: "Queued securely",
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+      },
+      permissions: privateUserPermissions(user.$id),
+    });
+    announceJob(job);
+    unsubscribe = client.subscribe<AiJob>(
+      Channel.tablesdb(config.databaseId).table("ai_jobs").row(jobId),
+      (event) => announceJob(event.payload),
+    );
+    requestBody = { ...action, jobId };
+  }
+
+  let execution;
+  try {
+    execution = await functions.createExecution({
     functionId: config.learningFunctionId,
-    body: JSON.stringify(action),
+    body: JSON.stringify(requestBody),
     async: runAsync,
     xpath: "/",
     method: ExecutionMethod.POST,
     headers: { "content-type": "application/json" },
-  });
+    });
+  } catch (caught) {
+    if (jobId) await tables.updateRow({ databaseId: config.databaseId, tableId: "ai_jobs", rowId: jobId, data: { status: "failed", progress: 100, stage: "Could not start", error: caught instanceof Error ? caught.message.slice(0, 20_000) : "Could not start AI job.", completedAt: new Date().toISOString() } }).catch(() => undefined);
+    unsubscribe?.();
+    throw caught;
+  }
 
-  if (runAsync) {
+  if (runAsync && jobId) {
     const deadline = Date.now() + 180_000;
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 1_200));
-      if (action.action === "process_material") {
-        const material = await tables.getRow({ databaseId: config.databaseId, tableId: "materials", rowId: action.materialId });
-        if (material.processingStatus === "failed") throw new Error("Cognora could not analyze this material.");
-        if (material.processingStatus === "ready") return { ok: true } as T;
-      } else {
-        const tableId = action.action === "generate_plan" ? "study_tasks" : action.action === "review_assignment" ? "feedback_reports" : action.action === "detect_gaps" ? "gap_insights" : action.action === "generate_roadmap" ? "roadmaps" : "coach_messages";
-        const key = action.action === "review_assignment" ? "assignmentId" : "courseId";
-        const value = action.action === "review_assignment" ? action.assignmentId : action.courseId;
-        const rows = await tables.listRows({ databaseId: config.databaseId, tableId, queries: [Query.equal(key, [value]), Query.limit(100)], ttl: 0 });
-        const created = rows.rows.find((row) => Date.parse(String(row.createdAt || row.$createdAt)) >= startedAt - 1_000);
-        if (created) return { ok: true } as T;
-        if (action.action === "review_assignment") {
-          const assignment = await tables.getRow({ databaseId: config.databaseId, tableId: "assignments", rowId: action.assignmentId });
-          if (assignment.status === "reviewed") return { ok: true } as T;
+    try {
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 1_200));
+        const job = await tables.getRow<AiJob>({ databaseId: config.databaseId, tableId: "ai_jobs", rowId: jobId });
+        announceJob(job);
+        if (job.status === "completed") return { ok: true, jobId } as T;
+        if (job.status === "failed") {
+          throw new Error(job.error || "Cognora AI could not complete that request.");
         }
       }
+      throw new Error("Cognora AI is taking longer than expected. The job remains visible in Activity.");
+    } finally {
+      unsubscribe?.();
     }
-    throw new Error("Cognora AI is taking longer than expected. Your work is safe; try refreshing in a moment.");
   }
 
   let payload: { ok?: boolean; error?: string } & Partial<T> = {};

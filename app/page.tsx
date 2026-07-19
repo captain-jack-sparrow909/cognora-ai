@@ -28,18 +28,19 @@ import {
   TimerReset,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { OnboardingScreen } from "@/components/auth/onboarding-screen";
 import { useAuth } from "@/components/auth/auth-provider";
-import { CoursesWorkspace } from "@/components/courses/courses-workspace";
-import { PracticeWorkspace, StudyPlannerWorkspace } from "@/components/learning/learning-workspaces";
-import {
-  AssignmentsWorkspace,
-  CoachWorkspace,
-  InsightsWorkspace,
-  RoadmapsWorkspace,
-} from "@/components/intelligence/intelligence-workspaces";
+import { ActivityCenter, SettingsWorkspace } from "@/components/operations/operations-workspaces";
+
+const CoursesWorkspace = lazy(() => import("@/components/courses/courses-workspace").then((module) => ({ default: module.CoursesWorkspace })));
+const StudyPlannerWorkspace = lazy(() => import("@/components/learning/learning-workspaces").then((module) => ({ default: module.StudyPlannerWorkspace })));
+const PracticeWorkspace = lazy(() => import("@/components/learning/learning-workspaces").then((module) => ({ default: module.PracticeWorkspace })));
+const AssignmentsWorkspace = lazy(() => import("@/components/intelligence/intelligence-workspaces").then((module) => ({ default: module.AssignmentsWorkspace })));
+const CoachWorkspace = lazy(() => import("@/components/intelligence/intelligence-workspaces").then((module) => ({ default: module.CoachWorkspace })));
+const InsightsWorkspace = lazy(() => import("@/components/intelligence/intelligence-workspaces").then((module) => ({ default: module.InsightsWorkspace })));
+const RoadmapsWorkspace = lazy(() => import("@/components/intelligence/intelligence-workspaces").then((module) => ({ default: module.RoadmapsWorkspace })));
 
 const navigation = [
   { id: "today", label: "Today", icon: LayoutDashboard },
@@ -111,6 +112,18 @@ export default function Home() {
   const [focusActive, setFocusActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState("today");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   if (loading) return <AppLoading />;
   if (!user) return <AuthScreen />;
@@ -127,6 +140,7 @@ export default function Home() {
 
   return (
     <main className="app-shell">
+      <a className="skip-link" href="#main-workspace">Skip to workspace</a>
       <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
         <div className="brand-row">
           <div className="brand-mark" aria-hidden="true">
@@ -153,6 +167,7 @@ export default function Home() {
               className={`nav-item ${activeView === item.id ? "active" : ""}`}
               type="button"
               key={item.label}
+              aria-current={activeView === item.id ? "page" : undefined}
               onClick={() => {
                 setActiveView(item.id);
                 setMenuOpen(false);
@@ -204,7 +219,7 @@ export default function Home() {
         />
       )}
 
-      <section className="main-content" id="today">
+      <section className="main-content" id="main-workspace" tabIndex={-1}>
         <header className="topbar">
           <button
             className="icon-button mobile-menu"
@@ -217,9 +232,10 @@ export default function Home() {
           <label className="search-field">
             <Search size={18} />
             <span className="sr-only">Search Cognora</span>
-            <input placeholder="Search courses, notes, concepts…" />
+            <input ref={searchRef} placeholder="Search courses, notes, concepts…" />
             <kbd>⌘ K</kbd>
           </label>
+          <ActivityCenter userId={user.$id} onOpenSettings={() => setActiveView("settings")} />
           <button className="help-button" type="button">
             <CircleHelp size={17} />
             Help
@@ -230,6 +246,7 @@ export default function Home() {
           </div>
         </header>
 
+        <Suspense fallback={<WorkspaceLoading />}>
         {activeView === "courses" ? (
           <CoursesWorkspace userId={user.$id} />
         ) : activeView === "planner" ? (
@@ -244,6 +261,8 @@ export default function Home() {
           <InsightsWorkspace userId={user.$id} />
         ) : activeView === "coach" ? (
           <CoachWorkspace userId={user.$id} />
+        ) : activeView === "settings" ? (
+          <SettingsWorkspace userId={user.$id} timezone={profile.timezone} />
         ) : activeView === "today" ? (
         <div className="page-wrap">
           <section className="welcome-row">
@@ -466,13 +485,14 @@ export default function Home() {
           </section>
 
           <footer className="product-footer">
-            <span>Phase 4 · Intelligence layer</span>
+            <span>Phase 5 · Production ready</span>
             <span>Plan → Learn → Practice → Understand</span>
           </footer>
         </div>
         ) : (
           <ModulePreview view={activeView} onOpenCourses={() => setActiveView("courses")} />
         )}
+        </Suspense>
       </section>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -500,6 +520,10 @@ function AppLoading() {
       <p>Connecting your learning workspace…</p>
     </main>
   );
+}
+
+function WorkspaceLoading() {
+  return <div className="workspace-route-loading" role="status"><LoaderCircle className="spin" size={20} /><span>Opening workspace…</span></div>;
 }
 
 function ModulePreview({ view, onOpenCourses }: { view: string; onOpenCourses: () => void }) {

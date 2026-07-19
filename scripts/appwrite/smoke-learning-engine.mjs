@@ -35,10 +35,43 @@ function executionPayload(execution) {
   return payload;
 }
 
-async function runAction(functions, ExecutionMethod, body, runAsync = true, completion) {
+const actionLabels = {
+  process_material: "Analyzing course material",
+  generate_plan: "Building an adaptive plan",
+  review_assignment: "Reviewing an assignment",
+  detect_gaps: "Detecting knowledge gaps",
+  generate_roadmap: "Building a learning roadmap",
+  ask_coach: "Preparing coach guidance",
+};
+
+async function runAction(functions, ExecutionMethod, body, runAsync = true, completion, context) {
+  let actionBody = body;
+  let jobId;
+  if (runAsync) {
+    jobId = ID.unique();
+    await context.tables.createRow({
+      databaseId,
+      tableId: "ai_jobs",
+      rowId: jobId,
+      data: {
+        ownerId: context.userId,
+        courseId: context.courseId,
+        entityId: body.materialId || body.assignmentId,
+        action: body.action,
+        label: actionLabels[body.action],
+        status: "queued",
+        progress: 2,
+        stage: "Queued securely",
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+      },
+      permissions: context.permissions,
+    });
+    actionBody = { ...body, jobId };
+  }
   const execution = await functions.createExecution({
     functionId,
-    body: JSON.stringify(body),
+    body: JSON.stringify(actionBody),
     async: runAsync,
     method: ExecutionMethod.POST,
   });
@@ -46,7 +79,12 @@ async function runAction(functions, ExecutionMethod, body, runAsync = true, comp
     const deadline = Date.now() + 180_000;
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1_200));
-      if (await completion()) return { ok: true };
+      const job = await context.tables.getRow({ databaseId, tableId: "ai_jobs", rowId: jobId });
+      if (job.status === "failed") throw new Error(job.error || `Execution ${execution.$id} failed.`);
+      if (job.status === "completed") {
+        if (!(await completion())) throw new Error(`Execution ${execution.$id} completed without its expected result.`);
+        return { ok: true, job };
+      }
     }
     throw new Error(`Execution ${execution.$id} timed out while polling for its persisted result.`);
   }
@@ -63,9 +101,9 @@ try {
   const password = `Cg!${randomBytes(18).toString("base64url")}`;
   await users.create({
     userId: created.userId,
-    email: `phase4-smoke-${Date.now()}@example.test`,
+    email: `phase5-smoke-${Date.now()}@example.test`,
     password,
-    name: "Phase 4 smoke test",
+    name: "Phase 5 smoke test",
   });
   const session = await users.createSession({ userId: created.userId });
   const jwt = await users.createJWT({ userId: created.userId, sessionId: session.$id, duration: 900 });
@@ -98,7 +136,7 @@ try {
       code: "BIO-SMOKE",
       color: "teal",
       term: "Validation",
-      description: "Temporary Phase 4 intelligence-loop validation.",
+      description: "Temporary Phase 5 production-loop validation.",
       targetGrade: "A",
       status: "active",
       createdAt: now,
@@ -112,7 +150,7 @@ try {
     rowId: ID.unique(),
     data: {
       ownerId: created.userId,
-      displayName: "Phase 4 smoke test",
+      displayName: "Phase 5 smoke test",
       studyLevel: "undergraduate",
       timezone: "Asia/Dubai",
       weeklyHours: 5,
@@ -150,16 +188,35 @@ try {
     permissions,
   });
   created.materialId = material.$id;
+  const operationContext = { tables, userId: created.userId, permissions, courseId: created.courseId };
+  await tables.createRow({
+    databaseId,
+    tableId: "reminder_preferences",
+    rowId: created.userId,
+    data: {
+      ownerId: created.userId,
+      inAppEnabled: true,
+      emailEnabled: false,
+      dailyTime: "18:00",
+      daysJson: '["mon","tue","wed","thu","fri"]',
+      timezone: "Asia/Dubai",
+      taskLeadMinutes: 30,
+      quietStart: "22:00",
+      quietEnd: "07:00",
+      updatedAt: now,
+    },
+    permissions,
+  });
 
   await runAction(functions, ExecutionMethod, { action: "process_material", materialId: created.materialId }, true, async () => {
     const row = await tables.getRow({ databaseId, tableId: "materials", rowId: created.materialId });
     if (row.processingStatus === "failed") throw new Error("Material processing failed.");
     return row.processingStatus === "ready";
-  });
+  }, operationContext);
   await runAction(functions, ExecutionMethod, { action: "generate_plan", courseId: created.courseId }, true, async () => {
     const rows = await tables.listRows({ databaseId, tableId: "study_tasks", queries: [Query.equal("courseId", [created.courseId])] });
     return rows.rows.length > 0;
-  });
+  }, operationContext);
 
   const [insights, concepts, tasks, practice] = await Promise.all([
     tables.listRows({ databaseId, tableId: "material_insights", queries: [Query.equal("courseId", [created.courseId])] }),
@@ -216,30 +273,36 @@ try {
   await runAction(functions, ExecutionMethod, { action: "review_assignment", assignmentId }, true, async () => {
     const rows = await tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("assignmentId", [assignmentId])] });
     return rows.rows.length > 0;
-  });
+  }, operationContext);
+
+  await runAction(functions, ExecutionMethod, { action: "sync_reminders" }, false);
   await runAction(functions, ExecutionMethod, { action: "detect_gaps", courseId: created.courseId }, true, async () => {
     const rows = await tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] });
     return rows.rows.length > 0;
-  });
+  }, operationContext);
   await runAction(functions, ExecutionMethod, { action: "generate_roadmap", courseId: created.courseId, goal: "Explain cellular respiration confidently in the final exam." }, true, async () => {
     const rows = await tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] });
     return rows.rows.length > 0;
-  });
+  }, operationContext);
   await runAction(functions, ExecutionMethod, { action: "ask_coach", courseId: created.courseId, message: "What should I study next, and which evidence supports that advice?" }, true, async () => {
     const rows = await tables.listRows({ databaseId, tableId: "coach_messages", queries: [Query.equal("courseId", [created.courseId])] });
     return rows.rows.length > 0;
-  });
+  }, operationContext);
 
-  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages] = await Promise.all([
+  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications] = await Promise.all([
     tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "roadmap_steps", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "coach_messages", queries: [Query.equal("courseId", [created.courseId])] }),
+    tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "notifications", queries: [Query.equal("ownerId", [created.userId])] }),
   ]);
   if (!reports.rows.length || !gapRows.rows.length || !roadmaps.rows.length || !roadmapSteps.rows.length || !coachMessages.rows.length) {
     throw new Error("The Phase 4 function actions completed without persisting the full intelligence loop.");
   }
+  if (aiJobs.rows.length !== 6 || aiJobs.rows.some((job) => job.status !== "completed" || job.progress !== 100 || !job.durationMs || !job.model)) throw new Error("Phase 5 AI job observability did not record complete operational metadata.");
+  if (!notifications.rows.some((notification) => notification.type === "ai-complete") || !notifications.rows.some((notification) => notification.type === "reminder")) throw new Error("Phase 5 notifications did not include both AI completion and study reminders.");
   console.log(JSON.stringify({
     function: functionId,
     materialStatus: "ready",
@@ -253,12 +316,17 @@ try {
     gapInsights: gapRows.rows.length,
     roadmapSteps: roadmapSteps.rows.length,
     coachResponseStored: Boolean(coachMessages.rows[0]?.answer),
+    completedAiJobs: aiJobs.rows.length,
+    recordedPromptTokens: aiJobs.rows.reduce((total, job) => total + (job.promptTokens || 0), 0),
+    notifications: notifications.rows.length,
+    reminderSynced: notifications.rows.some((notification) => notification.type === "reminder"),
   }, null, 2));
 } finally {
   if (created.courseId) {
-    for (const tableId of ["coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
-      const actualField = tableId === "profiles" ? "ownerId" : "courseId";
-      const value = tableId === "profiles" ? created.userId : created.courseId;
+    for (const tableId of ["notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
+      const ownerScoped = ["notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
+      const actualField = ownerScoped ? "ownerId" : "courseId";
+      const value = ownerScoped ? created.userId : created.courseId;
       await deleteMatching(tableId, [Query.equal(actualField, [value])]).catch(() => undefined);
     }
     await adminTables.deleteRow({ databaseId, tableId: "courses", rowId: created.courseId }).catch(() => undefined);

@@ -202,3 +202,49 @@ export type CoachMessage = Models.Row & {
   model: string;
   createdAt: string;
 };
+
+export type AiJob = Models.Row & {
+  ownerId: string;
+  courseId?: string;
+  entityId?: string;
+  action: string;
+  label: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  progress: number;
+  stage: string;
+  model?: string;
+  inputChars?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  durationMs?: number;
+  retryCount?: number;
+  error?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+};
+
+export type LearnerNotification = Models.Row & {
+  ownerId: string;
+  type: "reminder" | "ai-complete" | "ai-failed" | "insight";
+  title: string;
+  body: string;
+  entityType?: string;
+  entityId?: string;
+  read: boolean;
+  scheduledFor?: string;
+  createdAt: string;
+};
+
+export type ReminderPreferences = Models.Row & {
+  ownerId: string;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+  dailyTime: string;
+  daysJson: string;
+  timezone: string;
+  taskLeadMinutes: number;
+  quietStart?: string;
+  quietEnd?: string;
+  updatedAt: string;
+};
