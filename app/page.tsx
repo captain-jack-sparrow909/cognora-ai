@@ -33,6 +33,7 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 import { OnboardingScreen } from "@/components/auth/onboarding-screen";
 import { useAuth } from "@/components/auth/auth-provider";
 import { CoursesWorkspace } from "@/components/courses/courses-workspace";
+import { PracticeWorkspace, StudyPlannerWorkspace } from "@/components/learning/learning-workspaces";
 
 const navigation = [
   { id: "today", label: "Today", icon: LayoutDashboard },
@@ -224,6 +225,10 @@ export default function Home() {
 
         {activeView === "courses" ? (
           <CoursesWorkspace userId={user.$id} />
+        ) : activeView === "planner" ? (
+          <StudyPlannerWorkspace userId={user.$id} />
+        ) : activeView === "practice" ? (
+          <PracticeWorkspace userId={user.$id} />
         ) : activeView === "today" ? (
         <div className="page-wrap">
           <section className="welcome-row">
@@ -446,7 +451,7 @@ export default function Home() {
           </section>
 
           <footer className="product-footer">
-            <span>Phase 2 · Account and course foundation</span>
+            <span>Phase 3 · Core learning loop</span>
             <span>Plan → Learn → Practice → Understand</span>
           </footer>
         </div>
@@ -500,7 +505,7 @@ function ModulePreview({ view, onOpenCourses }: { view: string; onOpenCourses: (
         <p className="eyebrow">Connected capability</p>
         <h1>{content.title}</h1>
         <p>{content.description}</p>
-        <div className="module-foundation-note"><Check size={16} /> Account and course foundations are ready. This capability activates in Phase 3.</div>
+        <div className="module-foundation-note"><Check size={16} /> The core learning loop is active. This capability arrives in Phase 4.</div>
         <button className="create-course-button" type="button" onClick={onOpenCourses}>Build your course library <ArrowRight size={16} /></button>
       </section>
     </div>

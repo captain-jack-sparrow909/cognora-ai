@@ -1,0 +1,10 @@
+{
+  "name": "cognora-learning-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "node-appwrite": "^27.0.0",
+    "officeparser": "^7.3.0"
+  }
+}

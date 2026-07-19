@@ -46,3 +46,69 @@ export type CourseMaterial = Models.Row & {
   processingStatus: MaterialStatus;
   createdAt: string;
 };
+
+export type MaterialInsight = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  materialId: string;
+  title: string;
+  materialType: string;
+  summary: string;
+  outlineJson: string;
+  keyPointsJson: string;
+  sourceExcerpt?: string;
+  model: string;
+  createdAt: string;
+};
+
+export type CourseConcept = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  materialId: string;
+  title: string;
+  description: string;
+  mastery: number;
+  evidenceCount: number;
+  lastEvidenceAt?: string;
+  createdAt: string;
+};
+
+export type StudyTask = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  conceptId?: string;
+  materialId?: string;
+  title: string;
+  description?: string;
+  taskType: "review" | "practice" | "lecture" | "reading" | "project";
+  durationMinutes: number;
+  scheduledFor: string;
+  status: "planned" | "completed" | "skipped";
+  source: "syllabus" | "lecture" | "adaptive-plan" | "manual";
+  reason?: string;
+  createdAt: string;
+};
+
+export type PracticeItem = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  materialId: string;
+  conceptId?: string;
+  itemType: "flashcard" | "multiple-choice" | "short-answer";
+  prompt: string;
+  answer: string;
+  optionsJson?: string;
+  explanation: string;
+  createdAt: string;
+};
+
+export type MasteryRecord = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  conceptId: string;
+  mastery: number;
+  evidenceCount: number;
+  correctCount: number;
+  lastEvidence: string;
+  updatedAt: string;
+};

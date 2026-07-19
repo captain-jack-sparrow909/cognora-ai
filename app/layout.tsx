@@ -19,13 +19,13 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Cognora AI",
       description: "Your learning, finally connected.",
       type: "website",
-      images: [{ url: `${origin}/og-phase2.png`, width: 1536, height: 1024, alt: "Cognora AI secure course foundation" }],
+      images: [{ url: `${origin}/og-phase3.png`, width: 1536, height: 1024, alt: "Cognora AI material-to-mastery learning loop" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Cognora AI",
       description: "Your learning, finally connected.",
-      images: [`${origin}/og-phase2.png`],
+      images: [`${origin}/og-phase3.png`],
     },
   };
 }

@@ -12,7 +12,9 @@
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "appwrite:provision": "node --env-file=.env scripts/appwrite/provision.mjs"
+    "appwrite:provision": "node --env-file=.env scripts/appwrite/provision.mjs",
+    "appwrite:deploy-function": "node --env-file=.env scripts/appwrite/deploy-learning-engine.mjs",
+    "appwrite:smoke-learning": "node --env-file=.env scripts/appwrite/smoke-learning-engine.mjs"
   },
   "dependencies": {
     "appwrite": "^26.2.0",

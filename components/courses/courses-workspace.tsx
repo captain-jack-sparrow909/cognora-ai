@@ -24,6 +24,7 @@ import { getAppwriteBrowserServices } from "@/lib/appwrite/client";
 import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
 import type { Course, CourseColor, CourseMaterial, MaterialKind } from "@/lib/appwrite/models";
 import { privateUserPermissions } from "@/lib/appwrite/permissions";
+import { CourseLearningLoop } from "@/components/learning/learning-workspaces";
 
 const courseColors: Array<{ value: CourseColor; label: string }> = [
   { value: "cobalt", label: "Cobalt" },
@@ -227,6 +228,13 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
 
         {error && <p className="workspace-error" role="alert">{error}</p>}
 
+        <CourseLearningLoop
+          userId={userId}
+          course={selectedCourse}
+          materials={materials}
+          onMaterialsChanged={() => loadMaterials(selectedCourse.$id)}
+        />
+
         <section className="course-detail-grid">
           <article className="surface-card materials-card">
             <div className="section-heading">
@@ -277,9 +285,9 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
           <aside className="course-side-column">
             <article className="surface-card course-ready-card">
               <div className="ready-icon"><Sparkles size={19} /></div>
-              <p className="card-kicker">Next in Phase 3</p>
-              <h2>Make materials useful</h2>
-              <p>Lecture analysis, syllabus extraction, flashcards, and grounded course Q&amp;A will build on this private library.</p>
+              <p className="card-kicker">Phase 3 learning engine</p>
+              <h2>One material, four outcomes</h2>
+              <p>Analyze a file to create a grounded companion, adaptive tasks, recall practice, and the first mastery evidence.</p>
               <span><ShieldCheck size={15} /> Files are private to your account</span>
             </article>
             <article className="surface-card course-stat-card">

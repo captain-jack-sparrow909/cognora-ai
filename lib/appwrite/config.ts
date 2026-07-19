@@ -5,6 +5,7 @@ const publicConfigSchema = z.object({
   projectId: z.string().min(1),
   databaseId: z.string().min(1),
   materialsBucketId: z.string().min(1),
+  learningFunctionId: z.string().min(1),
 });
 
 const serverConfigSchema = publicConfigSchema.extend({
@@ -20,6 +21,7 @@ export function getPublicAppwriteConfig(): PublicAppwriteConfig {
     projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID,
     databaseId: process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
     materialsBucketId: process.env.NEXT_PUBLIC_APPWRITE_MATERIALS_BUCKET_ID,
+    learningFunctionId: process.env.NEXT_PUBLIC_APPWRITE_LEARNING_FUNCTION_ID ?? "learning-engine",
   });
 }
 

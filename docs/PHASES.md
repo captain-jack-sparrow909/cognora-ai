@@ -18,13 +18,15 @@
 
 Delivered with Appwrite-backed email/password accounts, private onboarding profiles, live course creation, course workspaces, private uploads, and an idempotent provisioning workflow.
 
-## Phase 3 — Core learning loop
+## Phase 3 — Core learning loop ✅
 
 - Syllabus extraction
 - Adaptive study planner
 - Lecture companion
 - Flashcards and quizzes
 - Initial mastery evidence
+
+Delivered with a private Appwrite Function backed by DeepSeek V4 Flash, document extraction, grounded lecture and syllabus insights, concept mapping, adaptive seven-day plans, generated flashcards and quizzes, scored practice attempts, and explainable mastery updates.
 
 ## Phase 4 — Intelligence layer
 

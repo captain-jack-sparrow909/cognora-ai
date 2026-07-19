@@ -113,10 +113,139 @@ const definitions = [
       { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "processingStatus"] },
     ],
   },
+  {
+    id: "material_insights",
+    name: "AI material insights",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "materialId", type: "varchar", size: 36, required: true },
+      { key: "title", type: "varchar", size: 255, required: true },
+      { key: "materialType", type: "varchar", size: 32, required: true },
+      { key: "summary", type: "text", required: true },
+      { key: "outlineJson", type: "text", required: true },
+      { key: "keyPointsJson", type: "text", required: true },
+      { key: "sourceExcerpt", type: "text", required: false },
+      { key: "model", type: "varchar", size: 64, required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "material_unique", type: TablesDBIndexType.Unique, columns: ["materialId"] },
+    ],
+  },
+  {
+    id: "concepts",
+    name: "Course concepts",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "materialId", type: "varchar", size: 36, required: true },
+      { key: "title", type: "varchar", size: 160, required: true },
+      { key: "description", type: "text", required: true },
+      { key: "mastery", type: "integer", min: 0, max: 100, required: false, default: 0 },
+      { key: "evidenceCount", type: "integer", min: 0, max: 100000, required: false, default: 0 },
+      { key: "lastEvidenceAt", type: "datetime", required: false },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "material_title", type: TablesDBIndexType.Key, columns: ["materialId", "title"] },
+      { key: "course_mastery", type: TablesDBIndexType.Key, columns: ["courseId", "mastery"] },
+    ],
+  },
+  {
+    id: "study_tasks",
+    name: "Adaptive study tasks",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "conceptId", type: "varchar", size: 36, required: false },
+      { key: "materialId", type: "varchar", size: 36, required: false },
+      { key: "title", type: "varchar", size: 200, required: true },
+      { key: "description", type: "text", required: false },
+      { key: "taskType", type: "enum", elements: ["review", "practice", "lecture", "reading", "project"], required: true },
+      { key: "durationMinutes", type: "integer", min: 5, max: 480, required: true },
+      { key: "scheduledFor", type: "datetime", required: true },
+      { key: "status", type: "enum", elements: ["planned", "completed", "skipped"], required: true },
+      { key: "source", type: "enum", elements: ["syllabus", "lecture", "adaptive-plan", "manual"], required: true },
+      { key: "reason", type: "text", required: false },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_schedule", type: TablesDBIndexType.Key, columns: ["ownerId", "scheduledFor"] },
+      { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "status"] },
+      { key: "material_source", type: TablesDBIndexType.Key, columns: ["materialId", "source"] },
+    ],
+  },
+  {
+    id: "practice_items",
+    name: "Recall and quiz items",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "materialId", type: "varchar", size: 36, required: true },
+      { key: "conceptId", type: "varchar", size: 36, required: false },
+      { key: "itemType", type: "enum", elements: ["flashcard", "multiple-choice", "short-answer"], required: true },
+      { key: "prompt", type: "text", required: true },
+      { key: "answer", type: "text", required: true },
+      { key: "optionsJson", type: "text", required: false },
+      { key: "explanation", type: "text", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "material_type", type: TablesDBIndexType.Key, columns: ["materialId", "itemType"] },
+      { key: "concept_type", type: TablesDBIndexType.Key, columns: ["conceptId", "itemType"] },
+    ],
+  },
+  {
+    id: "practice_attempts",
+    name: "Practice attempts",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "itemId", type: "varchar", size: 36, required: true },
+      { key: "conceptId", type: "varchar", size: 36, required: false },
+      { key: "response", type: "text", required: true },
+      { key: "correct", type: "boolean", required: true },
+      { key: "confidence", type: "integer", min: 1, max: 5, required: true },
+      { key: "masteryAfter", type: "integer", min: 0, max: 100, required: true },
+      { key: "answeredAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_answered", type: TablesDBIndexType.Key, columns: ["ownerId", "answeredAt"] },
+      { key: "concept_answered", type: TablesDBIndexType.Key, columns: ["conceptId", "answeredAt"] },
+      { key: "item_answered", type: TablesDBIndexType.Key, columns: ["itemId", "answeredAt"] },
+    ],
+  },
+  {
+    id: "mastery_records",
+    name: "Explainable mastery records",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "conceptId", type: "varchar", size: 36, required: true },
+      { key: "mastery", type: "integer", min: 0, max: 100, required: true },
+      { key: "evidenceCount", type: "integer", min: 0, max: 100000, required: true },
+      { key: "correctCount", type: "integer", min: 0, max: 100000, required: true },
+      { key: "lastEvidence", type: "text", required: true },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "concept_unique", type: TablesDBIndexType.Unique, columns: ["conceptId"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "course_mastery", type: TablesDBIndexType.Key, columns: ["courseId", "mastery"] },
+    ],
+  },
 ];
 
 function isNotFound(error) {
   return error && typeof error === "object" && error.code === 404;
+}
+
+function isConflict(error) {
+  return error && typeof error === "object" && error.code === 409;
 }
 
 async function getTable(tableId) {
@@ -227,15 +356,26 @@ async function ensureIndexes(definition) {
 for (const definition of definitions) {
   let table = await getTable(definition.id);
   if (!table) {
-    table = await tables.createTable({
-      databaseId,
-      tableId: definition.id,
-      name: definition.name,
-      permissions: authenticatedCreate,
-      rowSecurity: true,
-      enabled: true,
-    });
-    console.log(`Created table: ${definition.id}`);
+    try {
+      table = await tables.createTable({
+        databaseId,
+        tableId: definition.id,
+        name: definition.name,
+        permissions: authenticatedCreate,
+        rowSecurity: true,
+        enabled: true,
+      });
+      console.log(`Created table: ${definition.id}`);
+    } catch (error) {
+      if (!isConflict(error)) throw error;
+      const deadline = Date.now() + 30_000;
+      while (!table && Date.now() < deadline) {
+        table = await getTable(definition.id);
+        if (!table) await new Promise((resolve) => setTimeout(resolve, 1_000));
+      }
+      if (!table) throw error;
+      console.log(`Verified table after concurrent creation: ${definition.id}`);
+    }
   } else {
     await tables.updateTable({
       databaseId,
@@ -268,4 +408,4 @@ await storage.updateBucket({
 });
 
 console.log("Secured bucket: course-materials");
-console.log("Appwrite Phase 2 resources are ready.");
+console.log("Appwrite Phase 3 resources are ready.");

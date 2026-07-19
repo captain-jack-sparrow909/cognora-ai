@@ -26,9 +26,18 @@
 - `courses`: private student-owned course workspaces
 - `materials`: private metadata linked to uploaded Storage files
 
+### Phase 3 tables — provisioned
+
+- `material_insights`: grounded summaries, outlines, and key points for analyzed material
+- `concepts`: course knowledge units with current evidence counts and mastery
+- `study_tasks`: syllabus, lecture, and adaptive-plan study sessions
+- `practice_items`: grounded flashcards and quiz questions
+- `practice_attempts`: scored student responses and confidence evidence
+- `mastery_records`: one explainable mastery record per concept
+
 ### Planned tables
 
-`course_members`, `lectures`, `concepts`, `concept_relationships`, `assignments`, `submissions`, `feedback_reports`, `roadmaps`, `roadmap_steps`, `study_tasks`, `study_sessions`, `assessments`, `questions`, `attempts`, `mastery_records`, `gap_insights`, `ai_jobs`, and `notifications`.
+`course_members`, `lectures`, `concept_relationships`, `assignments`, `submissions`, `feedback_reports`, `roadmaps`, `roadmap_steps`, `study_sessions`, `assessments`, `gap_insights`, `ai_jobs`, and `notifications`.
 
 ### Storage
 
@@ -37,13 +46,15 @@
 
 ### Functions
 
-- `process-material`: extract, chunk, classify, and index document text
-- `generate-study-plan`: create a draft plan and pass it through scheduling rules
+- `learning-engine`: deployed authenticated Appwrite Function handling material processing, adaptive plan generation, practice scoring, and mastery updates through a user-scoped JWT
+
+- `process-material`: now implemented as the `process_material` learning-engine action
+- `generate-study-plan`: now implemented as the `generate_plan` learning-engine action
 - `analyze-lecture`: create summaries, concepts, questions, and recall items
 - `generate-roadmap`: build a prerequisite-aware learning sequence
 - `review-assignment`: produce rubric-linked advisory feedback
-- `update-mastery`: calculate concept evidence and gap signals
-- `deepseek-gateway`: shared validated model access, logging, retries, and cost controls
+- `update-mastery`: initial evidence calculation is implemented as the `submit_attempt` action; gap signals expand in Phase 4
+- `deepseek-gateway`: the learning engine currently owns validated JSON model access; shared logging, retries, and cost controls harden in Phase 5
 
 ## Retrieval approach
 
