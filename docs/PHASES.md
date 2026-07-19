@@ -28,12 +28,14 @@ Delivered with Appwrite-backed email/password accounts, private onboarding profi
 
 Delivered with a private Appwrite Function backed by DeepSeek V4 Flash, document extraction, grounded lecture and syllabus insights, concept mapping, adaptive seven-day plans, generated flashcards and quizzes, scored practice attempts, and explainable mastery updates.
 
-## Phase 4 — Intelligence layer
+## Phase 4 — Intelligence layer ✅
 
 - Assignment feedback
 - Knowledge gap detector
 - Roadmap adaptation
 - AI study coach with course context
+
+Delivered with private assignment submissions, rubric-linked advisory feedback, evidence-aware gap analysis, prerequisite-aware adaptive roadmaps, and a course-grounded DeepSeek coach. Long-running reasoning uses asynchronous Appwrite executions and persisted-result polling so work can safely exceed the synchronous response window.
 
 ## Phase 5 — Engagement and production readiness
 

@@ -238,6 +238,149 @@ const definitions = [
       { key: "course_mastery", type: TablesDBIndexType.Key, columns: ["courseId", "mastery"] },
     ],
   },
+  {
+    id: "assignments",
+    name: "Assignments",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "title", type: "varchar", size: 200, required: true },
+      { key: "brief", type: "text", required: true },
+      { key: "rubricText", type: "text", required: true },
+      { key: "dueAt", type: "datetime", required: false },
+      { key: "status", type: "enum", elements: ["draft", "submitted", "reviewed"], required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "status"] },
+    ],
+  },
+  {
+    id: "submissions",
+    name: "Assignment submissions",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "assignmentId", type: "varchar", size: 36, required: true },
+      { key: "fileId", type: "varchar", size: 36, required: true },
+      { key: "name", type: "varchar", size: 255, required: true },
+      { key: "mimeType", type: "varchar", size: 128, required: true },
+      { key: "size", type: "integer", min: 0, max: 52428800, required: true },
+      { key: "status", type: "enum", elements: ["uploaded", "reviewing", "reviewed", "failed"], required: true },
+      { key: "submittedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "assignment_unique", type: TablesDBIndexType.Unique, columns: ["assignmentId"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "status"] },
+    ],
+  },
+  {
+    id: "feedback_reports",
+    name: "AI assignment feedback",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "assignmentId", type: "varchar", size: 36, required: true },
+      { key: "submissionId", type: "varchar", size: 36, required: true },
+      { key: "summary", type: "text", required: true },
+      { key: "strengthsJson", type: "text", required: true },
+      { key: "improvementsJson", type: "text", required: true },
+      { key: "rubricJson", type: "text", required: true },
+      { key: "nextStepsJson", type: "text", required: true },
+      { key: "linkedConceptsJson", type: "text", required: true },
+      { key: "advisoryScore", type: "integer", min: 0, max: 100, required: true },
+      { key: "model", type: "varchar", size: 64, required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "assignment_unique", type: TablesDBIndexType.Unique, columns: ["assignmentId"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "course_created", type: TablesDBIndexType.Key, columns: ["courseId", "createdAt"] },
+    ],
+  },
+  {
+    id: "gap_insights",
+    name: "Knowledge gap insights",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "conceptId", type: "varchar", size: 36, required: true },
+      { key: "title", type: "varchar", size: 180, required: true },
+      { key: "severity", type: "enum", elements: ["high", "medium", "low"], required: true },
+      { key: "mastery", type: "integer", min: 0, max: 100, required: true },
+      { key: "evidenceCount", type: "integer", min: 0, max: 100000, required: true },
+      { key: "evidenceJson", type: "text", required: true },
+      { key: "explanation", type: "text", required: true },
+      { key: "recommendedAction", type: "text", required: true },
+      { key: "status", type: "enum", elements: ["open", "improving", "resolved"], required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "concept_unique", type: TablesDBIndexType.Unique, columns: ["conceptId"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "course_severity", type: TablesDBIndexType.Key, columns: ["courseId", "severity"] },
+    ],
+  },
+  {
+    id: "roadmaps",
+    name: "Learning roadmaps",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "goal", type: "text", required: true },
+      { key: "title", type: "varchar", size: 200, required: true },
+      { key: "summary", type: "text", required: true },
+      { key: "status", type: "enum", elements: ["active", "completed", "archived"], required: true },
+      { key: "model", type: "varchar", size: 64, required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "status"] },
+    ],
+  },
+  {
+    id: "roadmap_steps",
+    name: "Learning roadmap steps",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "roadmapId", type: "varchar", size: 36, required: true },
+      { key: "conceptId", type: "varchar", size: 36, required: false },
+      { key: "sequence", type: "integer", min: 1, max: 1000, required: true },
+      { key: "title", type: "varchar", size: 200, required: true },
+      { key: "description", type: "text", required: true },
+      { key: "status", type: "enum", elements: ["locked", "available", "in-progress", "completed"], required: true },
+      { key: "targetDate", type: "datetime", required: true },
+      { key: "reason", type: "text", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "roadmap_sequence", type: TablesDBIndexType.Unique, columns: ["roadmapId", "sequence"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "roadmap_status", type: TablesDBIndexType.Key, columns: ["roadmapId", "status"] },
+    ],
+  },
+  {
+    id: "coach_messages",
+    name: "AI study coach conversations",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: false },
+      { key: "question", type: "text", required: true },
+      { key: "answer", type: "text", required: true },
+      { key: "suggestedActionsJson", type: "text", required: true },
+      { key: "evidenceJson", type: "text", required: true },
+      { key: "model", type: "varchar", size: 64, required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_created", type: TablesDBIndexType.Key, columns: ["ownerId", "createdAt"] },
+      { key: "course_created", type: TablesDBIndexType.Key, columns: ["courseId", "createdAt"] },
+    ],
+  },
 ];
 
 function isNotFound(error) {
@@ -320,7 +463,11 @@ async function ensureColumns(definition) {
 
   for (const column of definition.columns) {
     if (existing.has(column.key)) continue;
-    await createColumn(definition.id, column);
+    try {
+      await createColumn(definition.id, column);
+    } catch (error) {
+      if (!isConflict(error)) throw error;
+    }
     await waitForColumn(definition.id, column.key);
   }
 }
@@ -331,13 +478,17 @@ async function ensureIndexes(definition) {
 
   for (const index of definition.indexes) {
     if (existing.has(index.key)) continue;
-    await tables.createIndex({
-      databaseId,
-      tableId: definition.id,
-      key: index.key,
-      type: index.type,
-      columns: index.columns,
-    });
+    try {
+      await tables.createIndex({
+        databaseId,
+        tableId: definition.id,
+        key: index.key,
+        type: index.type,
+        columns: index.columns,
+      });
+    } catch (error) {
+      if (!isConflict(error)) throw error;
+    }
   }
 
   const deadline = Date.now() + 90_000;
@@ -407,5 +558,29 @@ await storage.updateBucket({
   transformations: false,
 });
 
+const submissionsBucketId = process.env.APPWRITE_SUBMISSIONS_BUCKET_ID || "submissions";
+const submissionBucketConfig = {
+  bucketId: submissionsBucketId,
+  name: "assignment-submissions",
+  permissions: authenticatedCreate,
+  fileSecurity: true,
+  enabled: true,
+  maximumFileSize: 52_428_800,
+  allowedFileExtensions: ["pdf", "doc", "docx", "txt", "md"],
+  compression: Compression.None,
+  encryption: true,
+  antivirus: true,
+  transformations: false,
+};
+try {
+  await storage.getBucket({ bucketId: submissionsBucketId });
+  await storage.updateBucket(submissionBucketConfig);
+  console.log("Verified bucket: assignment-submissions");
+} catch (error) {
+  if (!isNotFound(error)) throw error;
+  await storage.createBucket(submissionBucketConfig);
+  console.log("Created bucket: assignment-submissions");
+}
+
 console.log("Secured bucket: course-materials");
-console.log("Appwrite Phase 3 resources are ready.");
+console.log("Appwrite Phase 4 resources are ready.");

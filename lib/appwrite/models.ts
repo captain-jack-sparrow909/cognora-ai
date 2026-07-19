@@ -112,3 +112,93 @@ export type MasteryRecord = Models.Row & {
   lastEvidence: string;
   updatedAt: string;
 };
+
+export type Assignment = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  title: string;
+  brief: string;
+  rubricText: string;
+  dueAt?: string;
+  status: "draft" | "submitted" | "reviewed";
+  createdAt: string;
+};
+
+export type AssignmentSubmission = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  assignmentId: string;
+  fileId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  status: "uploaded" | "reviewing" | "reviewed" | "failed";
+  submittedAt: string;
+};
+
+export type FeedbackReport = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  assignmentId: string;
+  submissionId: string;
+  summary: string;
+  strengthsJson: string;
+  improvementsJson: string;
+  rubricJson: string;
+  nextStepsJson: string;
+  linkedConceptsJson: string;
+  advisoryScore: number;
+  model: string;
+  createdAt: string;
+};
+
+export type GapInsight = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  conceptId: string;
+  title: string;
+  severity: "high" | "medium" | "low";
+  mastery: number;
+  evidenceCount: number;
+  evidenceJson: string;
+  explanation: string;
+  recommendedAction: string;
+  status: "open" | "improving" | "resolved";
+  createdAt: string;
+};
+
+export type LearningRoadmap = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  goal: string;
+  title: string;
+  summary: string;
+  status: "active" | "completed" | "archived";
+  model: string;
+  createdAt: string;
+};
+
+export type RoadmapStep = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  roadmapId: string;
+  conceptId?: string;
+  sequence: number;
+  title: string;
+  description: string;
+  status: "locked" | "available" | "in-progress" | "completed";
+  targetDate: string;
+  reason: string;
+  createdAt: string;
+};
+
+export type CoachMessage = Models.Row & {
+  ownerId: string;
+  courseId?: string;
+  question: string;
+  answer: string;
+  suggestedActionsJson: string;
+  evidenceJson: string;
+  model: string;
+  createdAt: string;
+};

@@ -34,6 +34,12 @@ import { OnboardingScreen } from "@/components/auth/onboarding-screen";
 import { useAuth } from "@/components/auth/auth-provider";
 import { CoursesWorkspace } from "@/components/courses/courses-workspace";
 import { PracticeWorkspace, StudyPlannerWorkspace } from "@/components/learning/learning-workspaces";
+import {
+  AssignmentsWorkspace,
+  CoachWorkspace,
+  InsightsWorkspace,
+  RoadmapsWorkspace,
+} from "@/components/intelligence/intelligence-workspaces";
 
 const navigation = [
   { id: "today", label: "Today", icon: LayoutDashboard },
@@ -43,6 +49,7 @@ const navigation = [
   { id: "assignments", label: "Assignments", icon: ClipboardCheck },
   { id: "practice", label: "Practice", icon: BrainCircuit },
   { id: "insights", label: "Insights", icon: BarChart3 },
+  { id: "coach", label: "AI Coach", icon: MessageCircleMore },
 ];
 
 const schedule = [
@@ -166,9 +173,9 @@ export default function Home() {
           </div>
           <p className="coach-kicker">AI study coach</p>
           <p className="coach-copy">You have a 45-minute opening before your next lecture.</p>
-          <a href="#coach-insight">
-            Plan it for me <ArrowRight size={14} />
-          </a>
+          <button className="coach-card-action" type="button" onClick={() => setActiveView("coach")}>
+            Ask Cognora <ArrowRight size={14} />
+          </button>
         </div>
 
         <div className="sidebar-footer">
@@ -229,6 +236,14 @@ export default function Home() {
           <StudyPlannerWorkspace userId={user.$id} />
         ) : activeView === "practice" ? (
           <PracticeWorkspace userId={user.$id} />
+        ) : activeView === "assignments" ? (
+          <AssignmentsWorkspace userId={user.$id} />
+        ) : activeView === "roadmaps" ? (
+          <RoadmapsWorkspace userId={user.$id} />
+        ) : activeView === "insights" ? (
+          <InsightsWorkspace userId={user.$id} />
+        ) : activeView === "coach" ? (
+          <CoachWorkspace userId={user.$id} />
         ) : activeView === "today" ? (
         <div className="page-wrap">
           <section className="welcome-row">
@@ -451,7 +466,7 @@ export default function Home() {
           </section>
 
           <footer className="product-footer">
-            <span>Phase 3 · Core learning loop</span>
+            <span>Phase 4 · Intelligence layer</span>
             <span>Plan → Learn → Practice → Understand</span>
           </footer>
         </div>
@@ -505,7 +520,7 @@ function ModulePreview({ view, onOpenCourses }: { view: string; onOpenCourses: (
         <p className="eyebrow">Connected capability</p>
         <h1>{content.title}</h1>
         <p>{content.description}</p>
-        <div className="module-foundation-note"><Check size={16} /> The core learning loop is active. This capability arrives in Phase 4.</div>
+        <div className="module-foundation-note"><Check size={16} /> Cognora’s intelligence layer is active. Production hardening arrives in Phase 5.</div>
         <button className="create-course-button" type="button" onClick={onOpenCourses}>Build your course library <ArrowRight size={16} /></button>
       </section>
     </div>

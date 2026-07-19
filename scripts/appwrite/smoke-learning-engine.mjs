@@ -20,8 +20,9 @@ const adminTables = new TablesDB(client);
 const adminStorage = new Storage(client);
 const databaseId = process.env.APPWRITE_DATABASE_ID;
 const bucketId = process.env.APPWRITE_MATERIALS_BUCKET_ID;
+const submissionsBucketId = process.env.APPWRITE_SUBMISSIONS_BUCKET_ID;
 const functionId = process.env.NEXT_PUBLIC_APPWRITE_LEARNING_FUNCTION_ID || "learning-engine";
-const created = { userId: ID.unique(), courseId: "", materialId: "", fileId: "" };
+const created = { userId: ID.unique(), courseId: "", materialId: "", fileId: "", submissionFileId: "" };
 
 async function deleteMatching(tableId, queries) {
   const result = await adminTables.listRows({ databaseId, tableId, queries: [...queries, Query.limit(100)] });
@@ -34,13 +35,37 @@ function executionPayload(execution) {
   return payload;
 }
 
+async function runAction(functions, ExecutionMethod, body, runAsync = true, completion) {
+  const execution = await functions.createExecution({
+    functionId,
+    body: JSON.stringify(body),
+    async: runAsync,
+    method: ExecutionMethod.POST,
+  });
+  if (runAsync) {
+    const deadline = Date.now() + 180_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      if (await completion()) return { ok: true };
+    }
+    throw new Error(`Execution ${execution.$id} timed out while polling for its persisted result.`);
+  }
+  if (execution.responseStatusCode >= 400) {
+    let message = execution.errors || "Function execution failed.";
+    try { message = JSON.parse(execution.responseBody || "{}").error || message; } catch {}
+    throw new Error(message);
+  }
+  if (!execution.responseBody) return { ok: true };
+  return executionPayload(execution);
+}
+
 try {
   const password = `Cg!${randomBytes(18).toString("base64url")}`;
   await users.create({
     userId: created.userId,
-    email: `phase3-smoke-${Date.now()}@example.test`,
+    email: `phase4-smoke-${Date.now()}@example.test`,
     password,
-    name: "Phase 3 smoke test",
+    name: "Phase 4 smoke test",
   });
   const session = await users.createSession({ userId: created.userId });
   const jwt = await users.createJWT({ userId: created.userId, sessionId: session.$id, duration: 900 });
@@ -73,7 +98,7 @@ try {
       code: "BIO-SMOKE",
       color: "teal",
       term: "Validation",
-      description: "Temporary Phase 3 learning-loop validation.",
+      description: "Temporary Phase 4 intelligence-loop validation.",
       targetGrade: "A",
       status: "active",
       createdAt: now,
@@ -87,7 +112,7 @@ try {
     rowId: ID.unique(),
     data: {
       ownerId: created.userId,
-      displayName: "Phase 3 smoke test",
+      displayName: "Phase 4 smoke test",
       studyLevel: "undergraduate",
       timezone: "Asia/Dubai",
       weeklyHours: 5,
@@ -126,18 +151,15 @@ try {
   });
   created.materialId = material.$id;
 
-  executionPayload(await functions.createExecution({
-    functionId,
-    body: JSON.stringify({ action: "process_material", materialId: created.materialId }),
-    async: false,
-    method: ExecutionMethod.POST,
-  }));
-  executionPayload(await functions.createExecution({
-    functionId,
-    body: JSON.stringify({ action: "generate_plan", courseId: created.courseId }),
-    async: false,
-    method: ExecutionMethod.POST,
-  }));
+  await runAction(functions, ExecutionMethod, { action: "process_material", materialId: created.materialId }, true, async () => {
+    const row = await tables.getRow({ databaseId, tableId: "materials", rowId: created.materialId });
+    if (row.processingStatus === "failed") throw new Error("Material processing failed.");
+    return row.processingStatus === "ready";
+  });
+  await runAction(functions, ExecutionMethod, { action: "generate_plan", courseId: created.courseId }, true, async () => {
+    const rows = await tables.listRows({ databaseId, tableId: "study_tasks", queries: [Query.equal("courseId", [created.courseId])] });
+    return rows.rows.length > 0;
+  });
 
   const [insights, concepts, tasks, practice] = await Promise.all([
     tables.listRows({ databaseId, tableId: "material_insights", queries: [Query.equal("courseId", [created.courseId])] }),
@@ -147,12 +169,77 @@ try {
   ]);
   const quiz = practice.rows.find((item) => item.itemType === "multiple-choice");
   if (!insights.rows.length || !concepts.rows.length || !tasks.rows.length || !quiz) throw new Error("The function completed without producing the full learning loop.");
-  const attempt = executionPayload(await functions.createExecution({
-    functionId,
-    body: JSON.stringify({ action: "submit_attempt", itemId: quiz.$id, response: quiz.answer, confidence: 4 }),
-    async: false,
-    method: ExecutionMethod.POST,
-  }));
+  const attempt = await runAction(functions, ExecutionMethod, { action: "submit_attempt", itemId: quiz.$id, response: quiz.answer, confidence: 4 }, false);
+
+  const assignmentId = ID.unique();
+  created.submissionFileId = ID.unique();
+  const assignmentText = "Cellular respiration transforms energy through linked stages. Glycolysis happens in the cytosol and produces pyruvate, ATP, and NADH. The citric acid cycle loads electron carriers in the mitochondrial matrix. These carriers supply the electron transport chain, which establishes a proton gradient. ATP synthase then uses chemiosmosis to produce ATP. Oxygen serves as the final electron acceptor, allowing electron flow to continue. This organization shows how location and energy transfer connect each stage, although a stronger response should compare the inputs and outputs quantitatively and explain why the gradient is essential.";
+  await storage.createFile({
+    bucketId: submissionsBucketId,
+    fileId: created.submissionFileId,
+    file: InputFile.fromPlainText(assignmentText, "cell-respiration-response.txt"),
+    permissions,
+  });
+  await tables.createRow({
+    databaseId,
+    tableId: "assignments",
+    rowId: assignmentId,
+    data: {
+      ownerId: created.userId,
+      courseId: created.courseId,
+      title: "Explain cellular respiration",
+      brief: "Explain how the stages of cellular respiration work together to produce ATP.",
+      rubricText: "Accuracy 40%; connection between stages 30%; use of evidence and terminology 20%; clarity 10%.",
+      status: "submitted",
+      createdAt: now,
+    },
+    permissions,
+  });
+  await tables.createRow({
+    databaseId,
+    tableId: "submissions",
+    rowId: ID.unique(),
+    data: {
+      ownerId: created.userId,
+      courseId: created.courseId,
+      assignmentId,
+      fileId: created.submissionFileId,
+      name: "cell-respiration-response.txt",
+      mimeType: "text/plain",
+      size: Buffer.byteLength(assignmentText),
+      status: "uploaded",
+      submittedAt: now,
+    },
+    permissions,
+  });
+
+  await runAction(functions, ExecutionMethod, { action: "review_assignment", assignmentId }, true, async () => {
+    const rows = await tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("assignmentId", [assignmentId])] });
+    return rows.rows.length > 0;
+  });
+  await runAction(functions, ExecutionMethod, { action: "detect_gaps", courseId: created.courseId }, true, async () => {
+    const rows = await tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] });
+    return rows.rows.length > 0;
+  });
+  await runAction(functions, ExecutionMethod, { action: "generate_roadmap", courseId: created.courseId, goal: "Explain cellular respiration confidently in the final exam." }, true, async () => {
+    const rows = await tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] });
+    return rows.rows.length > 0;
+  });
+  await runAction(functions, ExecutionMethod, { action: "ask_coach", courseId: created.courseId, message: "What should I study next, and which evidence supports that advice?" }, true, async () => {
+    const rows = await tables.listRows({ databaseId, tableId: "coach_messages", queries: [Query.equal("courseId", [created.courseId])] });
+    return rows.rows.length > 0;
+  });
+
+  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages] = await Promise.all([
+    tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("courseId", [created.courseId])] }),
+    tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] }),
+    tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] }),
+    tables.listRows({ databaseId, tableId: "roadmap_steps", queries: [Query.equal("courseId", [created.courseId])] }),
+    tables.listRows({ databaseId, tableId: "coach_messages", queries: [Query.equal("courseId", [created.courseId])] }),
+  ]);
+  if (!reports.rows.length || !gapRows.rows.length || !roadmaps.rows.length || !roadmapSteps.rows.length || !coachMessages.rows.length) {
+    throw new Error("The Phase 4 function actions completed without persisting the full intelligence loop.");
+  }
   console.log(JSON.stringify({
     function: functionId,
     materialStatus: "ready",
@@ -162,16 +249,21 @@ try {
     practiceItems: practice.rows.length,
     scoredAttempt: attempt.correct,
     masteryAfter: attempt.masteryAfter,
+    feedbackScore: reports.rows[0].advisoryScore,
+    gapInsights: gapRows.rows.length,
+    roadmapSteps: roadmapSteps.rows.length,
+    coachResponseStored: Boolean(coachMessages.rows[0]?.answer),
   }, null, 2));
 } finally {
   if (created.courseId) {
-    for (const tableId of ["practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
-      const field = tableId === "profiles" ? "ownerId" : tableId === "materials" ? "courseId" : tableId === "practice_attempts" || tableId === "mastery_records" || tableId === "practice_items" || tableId === "study_tasks" || tableId === "concepts" || tableId === "material_insights" ? "courseId" : "ownerId";
-      const value = field === "ownerId" ? created.userId : created.courseId;
-      await deleteMatching(tableId, [Query.equal(field, [value])]).catch(() => undefined);
+    for (const tableId of ["coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
+      const actualField = tableId === "profiles" ? "ownerId" : "courseId";
+      const value = tableId === "profiles" ? created.userId : created.courseId;
+      await deleteMatching(tableId, [Query.equal(actualField, [value])]).catch(() => undefined);
     }
     await adminTables.deleteRow({ databaseId, tableId: "courses", rowId: created.courseId }).catch(() => undefined);
   }
   if (created.fileId) await adminStorage.deleteFile({ bucketId, fileId: created.fileId }).catch(() => undefined);
+  if (created.submissionFileId) await adminStorage.deleteFile({ bucketId: submissionsBucketId, fileId: created.submissionFileId }).catch(() => undefined);
   await users.delete({ userId: created.userId }).catch(() => undefined);
 }

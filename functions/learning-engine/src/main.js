@@ -24,6 +24,14 @@ function stringList(value, limit = 12) {
     : [];
 }
 
+function valueList(value, limit = 12) {
+  return Array.isArray(value) ? value.slice(0, limit) : [];
+}
+
+function jsonText(value, limit = 12) {
+  return JSON.stringify(valueList(value, limit)).slice(0, 60_000);
+}
+
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, Number(value) || minimum));
 }
@@ -68,6 +76,7 @@ function createUserServices(req) {
     storage: new Storage(client),
     databaseId: process.env.APPWRITE_DATABASE_ID,
     bucketId: process.env.APPWRITE_MATERIALS_BUCKET_ID,
+    submissionsBucketId: process.env.APPWRITE_SUBMISSIONS_BUCKET_ID || "submissions",
   };
 }
 
@@ -424,6 +433,246 @@ async function submitAttempt(services, body) {
   return { ok: true, correct, correctAnswer: item.answer, explanation: item.explanation, masteryAfter };
 }
 
+async function reviewAssignment(services, body) {
+  const assignmentId = text(body.assignmentId);
+  if (!assignmentId) throw new Error("Choose an assignment to review.");
+  const { tables, storage, databaseId, submissionsBucketId, userId } = services;
+  const assignment = await tables.getRow({ databaseId, tableId: "assignments", rowId: assignmentId });
+  if (assignment.ownerId !== userId) throw new Error("This assignment does not belong to your account.");
+  const submissions = await tables.listRows({
+    databaseId,
+    tableId: "submissions",
+    queries: [Query.equal("assignmentId", [assignmentId]), Query.limit(1)],
+  });
+  const submission = submissions.rows[0];
+  if (!submission) throw new Error("Upload a submission before requesting feedback.");
+
+  await tables.updateRow({ databaseId, tableId: "submissions", rowId: submission.$id, data: { status: "reviewing" } });
+  try {
+    const [fileBuffer, concepts] = await Promise.all([
+      storage.getFileDownload({ bucketId: submissionsBucketId, fileId: submission.fileId }),
+      tables.listRows({ databaseId, tableId: "concepts", queries: [Query.equal("courseId", [assignment.courseId]), Query.limit(30)] }),
+    ]);
+    const extracted = (await extractText(fileBuffer, submission.name, submission.mimeType)).replace(/\u0000/g, "").trim();
+    if (extracted.length < 40) throw new Error("The submission did not contain enough extractable text.");
+    const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
+    const { data, model: usedModel } = await callDeepSeek({
+      model,
+      system: "You are Cognora's assignment feedback coach. Give rigorous, constructive, rubric-linked feedback. Your score is advisory, never an official grade. Do not rewrite the student's submission. Quote no more than a short phrase when pointing to evidence.",
+      prompt: `Review this student submission. Assignment title: ${assignment.title}. Brief: ${assignment.brief}. Rubric: ${assignment.rubricText}. Course concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, description: concept.description })))}. Return {"summary":"overall assessment", "advisoryScore":78, "strengths":["specific strength"], "improvements":[{"issue":"issue", "evidence":"brief evidence", "howToImprove":"action"}], "rubric":[{"criterion":"criterion", "level":"advisory level", "score":80, "feedback":"feedback"}], "nextSteps":["ordered revision action"], "linkedConcepts":[{"conceptId":"exact supplied id", "title":"concept title", "reason":"why it matters"}]}. Submission:\n${extracted.slice(0, MAX_SOURCE_CHARS)}`,
+      maxTokens: 5200,
+    });
+    const now = new Date().toISOString();
+    await deleteRows(tables, databaseId, "feedback_reports", [Query.equal("assignmentId", [assignmentId])]);
+    const report = await tables.createRow({
+      databaseId,
+      tableId: "feedback_reports",
+      rowId: ID.unique(),
+      data: {
+        ownerId: userId,
+        courseId: assignment.courseId,
+        assignmentId,
+        submissionId: submission.$id,
+        summary: text(data.summary, "Cognora completed an advisory review.").slice(0, 30_000),
+        strengthsJson: JSON.stringify(stringList(data.strengths, 10)),
+        improvementsJson: jsonText(data.improvements, 10),
+        rubricJson: jsonText(data.rubric, 12),
+        nextStepsJson: JSON.stringify(stringList(data.nextSteps, 10)),
+        linkedConceptsJson: jsonText(data.linkedConcepts, 10),
+        advisoryScore: clamp(data.advisoryScore, 0, 100),
+        model: usedModel.slice(0, 64),
+        createdAt: now,
+      },
+      permissions: userPermissions(userId),
+    });
+    await Promise.all([
+      tables.updateRow({ databaseId, tableId: "submissions", rowId: submission.$id, data: { status: "reviewed" } }),
+      tables.updateRow({ databaseId, tableId: "assignments", rowId: assignmentId, data: { status: "reviewed" } }),
+    ]);
+    return { ok: true, reportId: report.$id, advisoryScore: report.advisoryScore };
+  } catch (caught) {
+    await tables.updateRow({ databaseId, tableId: "submissions", rowId: submission.$id, data: { status: "failed" } }).catch(() => undefined);
+    throw caught;
+  }
+}
+
+async function detectGaps(services, body) {
+  const courseId = text(body.courseId);
+  if (!courseId) throw new Error("Choose a course to scan for gaps.");
+  const { tables, databaseId, userId } = services;
+  const course = await tables.getRow({ databaseId, tableId: "courses", rowId: courseId });
+  if (course.ownerId !== userId) throw new Error("This course does not belong to your account.");
+  const [concepts, attempts, records] = await Promise.all([
+    tables.listRows({ databaseId, tableId: "concepts", queries: [Query.equal("courseId", [courseId]), Query.orderAsc("mastery"), Query.limit(50)] }),
+    tables.listRows({ databaseId, tableId: "practice_attempts", queries: [Query.equal("courseId", [courseId]), Query.orderDesc("answeredAt"), Query.limit(100)] }),
+    tables.listRows({ databaseId, tableId: "mastery_records", queries: [Query.equal("courseId", [courseId]), Query.limit(50)] }),
+  ]);
+  if (concepts.rows.length === 0) throw new Error("Analyze course material before detecting knowledge gaps.");
+  const model = process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash";
+  const { data } = await callDeepSeek({
+    model,
+    system: "You are Cognora's evidence-based knowledge gap detector. Separate missing evidence from demonstrated weakness. Never label a student weak solely because they have not attempted a concept. Explain every gap with the supplied evidence.",
+    prompt: `Analyze gaps for ${course.title}. Concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, description: concept.description, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Mastery records: ${JSON.stringify(records.rows.map((record) => ({ conceptId: record.conceptId, mastery: record.mastery, evidenceCount: record.evidenceCount, correctCount: record.correctCount, lastEvidence: record.lastEvidence })))}. Recent attempts: ${JSON.stringify(attempts.rows.map((attempt) => ({ conceptId: attempt.conceptId, correct: attempt.correct, confidence: attempt.confidence, masteryAfter: attempt.masteryAfter })))}. Return {"gaps":[{"conceptId":"exact id", "title":"concept title", "severity":"high|medium|low", "evidence":["specific evidence or missing-evidence statement"], "explanation":"why this is a gap", "recommendedAction":"specific next learning action"}]}. Return at most 8, prioritizing demonstrated weakness, then low-evidence concepts.`,
+      maxTokens: 3600,
+    });
+  await deleteRows(tables, databaseId, "gap_insights", [Query.equal("courseId", [courseId])]);
+  const conceptMap = new Map(concepts.rows.map((concept) => [concept.$id, concept]));
+  const now = new Date().toISOString();
+  const permissions = userPermissions(userId);
+  let created = 0;
+  for (const candidate of valueList(data.gaps, 8)) {
+    const concept = conceptMap.get(candidate?.conceptId);
+    if (!concept) continue;
+    const mastery = concept.mastery || 0;
+    const severity = ["high", "medium", "low"].includes(candidate?.severity) ? candidate.severity : mastery < 35 ? "high" : mastery < 60 ? "medium" : "low";
+    const status = mastery >= 70 ? "resolved" : mastery >= 45 ? "improving" : "open";
+    await tables.createRow({
+      databaseId,
+      tableId: "gap_insights",
+      rowId: ID.unique(),
+      data: {
+        ownerId: userId,
+        courseId,
+        conceptId: concept.$id,
+        title: text(candidate?.title, concept.title).slice(0, 180),
+        severity,
+        mastery,
+        evidenceCount: concept.evidenceCount || 0,
+        evidenceJson: JSON.stringify(stringList(candidate?.evidence, 8)),
+        explanation: text(candidate?.explanation, "More evidence is needed for this concept.").slice(0, 20_000),
+        recommendedAction: text(candidate?.recommendedAction, `Complete a focused practice session on ${concept.title}.`).slice(0, 20_000),
+        status,
+        createdAt: now,
+      },
+      permissions,
+    });
+    created += 1;
+  }
+  return { ok: true, created };
+}
+
+async function generateRoadmap(services, body) {
+  const courseId = text(body.courseId);
+  const goal = text(body.goal);
+  if (!courseId || !goal) throw new Error("Choose a course and describe your roadmap goal.");
+  const { tables, databaseId, userId } = services;
+  const course = await tables.getRow({ databaseId, tableId: "courses", rowId: courseId });
+  if (course.ownerId !== userId) throw new Error("This course does not belong to your account.");
+  const [concepts, gaps, profileRows] = await Promise.all([
+    tables.listRows({ databaseId, tableId: "concepts", queries: [Query.equal("courseId", [courseId]), Query.limit(50)] }),
+    tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [courseId]), Query.limit(20)] }),
+    tables.listRows({ databaseId, tableId: "profiles", queries: [Query.equal("ownerId", [userId]), Query.limit(1)] }),
+  ]);
+  if (concepts.rows.length === 0) throw new Error("Analyze course material before creating a learning roadmap.");
+  const existing = await tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [courseId]), Query.equal("status", ["active"]), Query.limit(10)] });
+  for (const roadmap of existing.rows) await tables.updateRow({ databaseId, tableId: "roadmaps", rowId: roadmap.$id, data: { status: "archived" } });
+  const profile = profileRows.rows[0];
+  const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
+  const { data, model: usedModel } = await callDeepSeek({
+    model,
+    system: "You are Cognora's prerequisite-aware learning roadmap architect. Sequence foundations before dependent skills, adapt around evidence-backed gaps, and make every step achievable within the student's available time.",
+    prompt: `Build a roadmap for ${course.title}. Goal: ${goal}. Weekly hours: ${profile?.weeklyHours || 6}. Concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ id: concept.$id, title: concept.title, description: concept.description, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Current gaps: ${JSON.stringify(gaps.rows.map((gap) => ({ conceptId: gap.conceptId, severity: gap.severity, explanation: gap.explanation, recommendedAction: gap.recommendedAction })))}. Return {"title":"roadmap title", "summary":"how this path reaches the goal", "steps":[{"conceptId":"exact supplied id when relevant", "title":"milestone", "description":"specific outcome and activity", "targetDate":"ISO date", "reason":"prerequisite or evidence-based reason"}]}. Return 5-10 ordered steps.`,
+    maxTokens: 4600,
+  });
+  const now = new Date().toISOString();
+  const permissions = userPermissions(userId);
+  const roadmap = await tables.createRow({
+    databaseId,
+    tableId: "roadmaps",
+    rowId: ID.unique(),
+    data: {
+      ownerId: userId,
+      courseId,
+      goal: goal.slice(0, 30_000),
+      title: text(data.title, `${course.title} learning roadmap`).slice(0, 200),
+      summary: text(data.summary, `A focused path toward ${goal}.`).slice(0, 30_000),
+      status: "active",
+      model: usedModel.slice(0, 64),
+      createdAt: now,
+    },
+    permissions,
+  });
+  const conceptIds = new Set(concepts.rows.map((concept) => concept.$id));
+  let created = 0;
+  for (const [index, step] of valueList(data.steps, 10).entries()) {
+    const title = text(step?.title);
+    if (!title) continue;
+    await tables.createRow({
+      databaseId,
+      tableId: "roadmap_steps",
+      rowId: ID.unique(),
+      data: {
+        ownerId: userId,
+        courseId,
+        roadmapId: roadmap.$id,
+        conceptId: conceptIds.has(step?.conceptId) ? step.conceptId : undefined,
+        sequence: index + 1,
+        title: title.slice(0, 200),
+        description: text(step?.description).slice(0, 20_000),
+        status: index === 0 ? "available" : "locked",
+        targetDate: safeDate(step?.targetDate, (index + 1) * 5),
+        reason: text(step?.reason, "Sequenced from course prerequisites and current evidence.").slice(0, 20_000),
+        createdAt: now,
+      },
+      permissions,
+    });
+    created += 1;
+  }
+  return { ok: true, roadmapId: roadmap.$id, created };
+}
+
+async function askCoach(services, body) {
+  const courseId = text(body.courseId);
+  const message = text(body.message);
+  if (!message) throw new Error("Ask Cognora a study question.");
+  const { tables, databaseId, userId } = services;
+  let course;
+  if (courseId) {
+    course = await tables.getRow({ databaseId, tableId: "courses", rowId: courseId });
+    if (course.ownerId !== userId) throw new Error("This course does not belong to your account.");
+  }
+  const courseQueries = courseId ? [Query.equal("courseId", [courseId])] : [Query.equal("ownerId", [userId])];
+  const [profiles, concepts, gaps, tasks, insights, roadmaps] = await Promise.all([
+    tables.listRows({ databaseId, tableId: "profiles", queries: [Query.equal("ownerId", [userId]), Query.limit(1)] }),
+    tables.listRows({ databaseId, tableId: "concepts", queries: [...courseQueries, Query.orderAsc("mastery"), Query.limit(20)] }),
+    tables.listRows({ databaseId, tableId: "gap_insights", queries: [...courseQueries, Query.limit(12)] }),
+    tables.listRows({ databaseId, tableId: "study_tasks", queries: [...courseQueries, Query.equal("status", ["planned"]), Query.orderAsc("scheduledFor"), Query.limit(12)] }),
+    tables.listRows({ databaseId, tableId: "material_insights", queries: [...courseQueries, Query.orderDesc("createdAt"), Query.limit(5)] }),
+    tables.listRows({ databaseId, tableId: "roadmaps", queries: [...courseQueries, Query.equal("status", ["active"]), Query.limit(5)] }),
+  ]);
+  const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
+  const { data, model: usedModel } = await callDeepSeek({
+    model,
+    system: "You are Cognora, a calm and evidence-aware AI study coach. Answer directly, give actionable next steps, and explain which course evidence supports your advice. Clearly say when the available evidence is insufficient. Do not claim to change schedules or grades.",
+    prompt: `Student profile: ${JSON.stringify(profiles.rows[0] || {})}. Selected course: ${JSON.stringify(course ? { id: course.$id, title: course.title, description: course.description, targetGrade: course.targetGrade } : null)}. Lowest-mastery concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ title: concept.title, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Gap insights: ${JSON.stringify(gaps.rows.map((gap) => ({ title: gap.title, severity: gap.severity, explanation: gap.explanation, recommendedAction: gap.recommendedAction })))}. Planned tasks: ${JSON.stringify(tasks.rows.map((task) => ({ title: task.title, scheduledFor: task.scheduledFor, durationMinutes: task.durationMinutes, reason: task.reason })))}. Material summaries: ${JSON.stringify(insights.rows.map((insight) => ({ title: insight.title, summary: insight.summary.slice(0, 1800) })))}. Active roadmaps: ${JSON.stringify(roadmaps.rows.map((roadmap) => ({ title: roadmap.title, goal: roadmap.goal, summary: roadmap.summary })))}. Student question: ${message}. Return {"answer":"clear coach response", "suggestedActions":["specific action"], "evidence":["course evidence used or an explicit insufficient-evidence note"]}.`,
+    maxTokens: 3200,
+  });
+  const now = new Date().toISOString();
+  const coachMessage = await tables.createRow({
+    databaseId,
+    tableId: "coach_messages",
+    rowId: ID.unique(),
+    data: {
+      ownerId: userId,
+      courseId: courseId || undefined,
+      question: message.slice(0, 20_000),
+      answer: text(data.answer, "I need more course evidence before I can answer reliably.").slice(0, 30_000),
+      suggestedActionsJson: JSON.stringify(stringList(data.suggestedActions, 8)),
+      evidenceJson: JSON.stringify(stringList(data.evidence, 8)),
+      model: usedModel.slice(0, 64),
+      createdAt: now,
+    },
+    permissions: userPermissions(userId),
+  });
+  return {
+    ok: true,
+    messageId: coachMessage.$id,
+    answer: coachMessage.answer,
+    suggestedActions: stringList(data.suggestedActions, 8),
+    evidence: stringList(data.evidence, 8),
+  };
+}
+
 async function main({ req, res, log, error }) {
   try {
     if (req.method !== "POST") return res.json({ ok: true, function: functionId }, 200);
@@ -434,6 +683,10 @@ async function main({ req, res, log, error }) {
     if (body.action === "process_material") result = await processMaterial(services, body);
     else if (body.action === "generate_plan") result = await generatePlan(services, body);
     else if (body.action === "submit_attempt") result = await submitAttempt(services, body);
+    else if (body.action === "review_assignment") result = await reviewAssignment(services, body);
+    else if (body.action === "detect_gaps") result = await detectGaps(services, body);
+    else if (body.action === "generate_roadmap") result = await generateRoadmap(services, body);
+    else if (body.action === "ask_coach") result = await askCoach(services, body);
     else throw new Error("Unknown learning engine action.");
     return res.json(result, 200);
   } catch (caught) {

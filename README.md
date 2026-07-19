@@ -4,7 +4,7 @@ Cognora AI is a personal learning operating system that connects planning, lectu
 
 ## Current product state
 
-Phase 3 provides:
+Phase 4 provides:
 
 - Appwrite email/password authentication
 - private student profiles and onboarding preferences
@@ -15,8 +15,11 @@ Phase 3 provides:
 - grounded syllabus and lecture analysis through DeepSeek
 - concept extraction, adaptive seven-day study plans, flashcards, and quizzes
 - scored practice attempts and explainable concept mastery evidence
-
-Phase 4 will add assignment feedback, deeper knowledge-gap detection, roadmap adaptation, and the course-aware AI study coach.
+- private assignment uploads and rubric-linked advisory feedback
+- evidence-aware knowledge-gap detection
+- prerequisite-aware adaptive learning roadmaps
+- a course-grounded AI study coach
+- asynchronous persisted-result handling for long DeepSeek reasoning jobs
 
 ## Stack
 
@@ -32,7 +35,7 @@ Phase 4 will add assignment feedback, deeper knowledge-gap detection, roadmap ad
 2. Install dependencies with `npm install`.
 3. Provision the Appwrite resources with `npm run appwrite:provision`.
 4. Deploy the learning function with `npm run appwrite:deploy-function`.
-5. Optionally validate the full temporary learning loop with `npm run appwrite:smoke-learning`.
+5. Optionally validate the full temporary learning and intelligence loop with `npm run appwrite:smoke-learning`.
 6. Start the app with `npm run dev`.
 
 ## Validation

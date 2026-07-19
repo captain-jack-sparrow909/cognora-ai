@@ -35,26 +35,40 @@
 - `practice_attempts`: scored student responses and confidence evidence
 - `mastery_records`: one explainable mastery record per concept
 
+### Phase 4 tables — provisioned
+
+- `assignments`: private briefs, rubrics, due dates, and review state
+- `submissions`: private assignment-file metadata and review lifecycle
+- `feedback_reports`: rubric-linked strengths, improvements, advisory scores, and revision plans
+- `gap_insights`: explainable concept gaps separated from missing evidence
+- `roadmaps`: active, completed, and archived learning goals
+- `roadmap_steps`: ordered, unlockable roadmap milestones
+- `coach_messages`: course-grounded questions, answers, actions, and evidence
+
 ### Planned tables
 
-`course_members`, `lectures`, `concept_relationships`, `assignments`, `submissions`, `feedback_reports`, `roadmaps`, `roadmap_steps`, `study_sessions`, `assessments`, `gap_insights`, `ai_jobs`, and `notifications`.
+`course_members`, `lectures`, `concept_relationships`, `study_sessions`, `assessments`, `ai_jobs`, and `notifications`.
 
 ### Storage
 
 - `course-materials`: provisioned with file-level security, encryption, antivirus scanning, a 50 MB limit, and document-only extensions
-- `submissions`: private assignment files
+- `assignment-submissions` (`submissions`): provisioned with file-level security, encryption, antivirus scanning, a 50 MB limit, and assignment-document extensions
 
 ### Functions
 
-- `learning-engine`: deployed authenticated Appwrite Function handling material processing, adaptive plan generation, practice scoring, and mastery updates through a user-scoped JWT
+- `learning-engine`: deployed authenticated Appwrite Function handling material processing, adaptive planning, practice scoring, mastery updates, assignment feedback, knowledge-gap detection, roadmap generation, and contextual coaching through a user-scoped JWT
 
 - `process-material`: now implemented as the `process_material` learning-engine action
 - `generate-study-plan`: now implemented as the `generate_plan` learning-engine action
 - `analyze-lecture`: create summaries, concepts, questions, and recall items
-- `generate-roadmap`: build a prerequisite-aware learning sequence
-- `review-assignment`: produce rubric-linked advisory feedback
-- `update-mastery`: initial evidence calculation is implemented as the `submit_attempt` action; gap signals expand in Phase 4
+- `generate-roadmap`: implemented as the `generate_roadmap` action
+- `review-assignment`: implemented as the `review_assignment` action
+- `detect-gaps`: implemented as the `detect_gaps` action with explicit evidence and missing-evidence handling
+- `ask-coach`: implemented as the `ask_coach` action grounded in profile, course, concepts, gaps, plan, materials, and roadmap
+- `update-mastery`: implemented as the `submit_attempt` action
 - `deepseek-gateway`: the learning engine currently owns validated JSON model access; shared logging, retries, and cost controls harden in Phase 5
+
+Long-running AI actions are submitted asynchronously. The browser polls the user-owned result records rather than relying on Appwrite's 30-second synchronous execution response window.
 
 ## Retrieval approach
 
