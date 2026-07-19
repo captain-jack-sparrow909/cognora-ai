@@ -20,13 +20,19 @@
 
 ## Initial Appwrite resources
 
-### Tables
+### Phase 2 tables — provisioned
 
-`profiles`, `courses`, `course_members`, `materials`, `lectures`, `concepts`, `concept_relationships`, `assignments`, `submissions`, `feedback_reports`, `roadmaps`, `roadmap_steps`, `study_tasks`, `study_sessions`, `assessments`, `questions`, `attempts`, `mastery_records`, `gap_insights`, `ai_jobs`, and `notifications`.
+- `profiles`: one private onboarding profile per Appwrite user
+- `courses`: private student-owned course workspaces
+- `materials`: private metadata linked to uploaded Storage files
+
+### Planned tables
+
+`course_members`, `lectures`, `concepts`, `concept_relationships`, `assignments`, `submissions`, `feedback_reports`, `roadmaps`, `roadmap_steps`, `study_tasks`, `study_sessions`, `assessments`, `questions`, `attempts`, `mastery_records`, `gap_insights`, `ai_jobs`, and `notifications`.
 
 ### Storage
 
-- `course-materials`: private PDFs, slides, notes, and transcripts
+- `course-materials`: provisioned with file-level security, encryption, antivirus scanning, a 50 MB limit, and document-only extensions
 - `submissions`: private assignment files
 
 ### Functions

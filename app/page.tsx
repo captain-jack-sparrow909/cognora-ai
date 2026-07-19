@@ -15,9 +15,10 @@ import {
   Flame,
   FolderOpen,
   LayoutDashboard,
+  LoaderCircle,
+  LogOut,
   Menu,
   MessageCircleMore,
-  MoreHorizontal,
   Play,
   Route,
   Search,
@@ -28,15 +29,19 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { AuthScreen } from "@/components/auth/auth-screen";
+import { OnboardingScreen } from "@/components/auth/onboarding-screen";
+import { useAuth } from "@/components/auth/auth-provider";
+import { CoursesWorkspace } from "@/components/courses/courses-workspace";
 
 const navigation = [
-  { label: "Today", icon: LayoutDashboard, active: true },
-  { label: "Courses", icon: FolderOpen },
-  { label: "Planner", icon: CalendarDays },
-  { label: "Roadmaps", icon: Route },
-  { label: "Assignments", icon: ClipboardCheck },
-  { label: "Practice", icon: BrainCircuit },
-  { label: "Insights", icon: BarChart3 },
+  { id: "today", label: "Today", icon: LayoutDashboard },
+  { id: "courses", label: "Courses", icon: FolderOpen },
+  { id: "planner", label: "Planner", icon: CalendarDays },
+  { id: "roadmaps", label: "Roadmaps", icon: Route },
+  { id: "assignments", label: "Assignments", icon: ClipboardCheck },
+  { id: "practice", label: "Practice", icon: BrainCircuit },
+  { id: "insights", label: "Insights", icon: BarChart3 },
 ];
 
 const schedule = [
@@ -94,8 +99,23 @@ const mastery = [
 ];
 
 export default function Home() {
+  const { user, profile, loading, signOut } = useAuth();
   const [focusActive, setFocusActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeView, setActiveView] = useState("today");
+
+  if (loading) return <AppLoading />;
+  if (!user) return <AuthScreen />;
+  if (!profile) return <OnboardingScreen />;
+
+  const firstName = profile.displayName.split(" ")[0] || "there";
+  const initials = profile.displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const studyLevel = profile.studyLevel.replace("-", " ");
 
   return (
     <main className="app-shell">
@@ -121,16 +141,19 @@ export default function Home() {
         <nav className="primary-nav" aria-label="Primary navigation">
           <p className="nav-label">Workspace</p>
           {navigation.map((item) => (
-            <a
-              className={`nav-item ${item.active ? "active" : ""}`}
-              href={item.active ? "#today" : "#learning-system"}
+            <button
+              className={`nav-item ${activeView === item.id ? "active" : ""}`}
+              type="button"
               key={item.label}
-              onClick={() => setMenuOpen(false)}
+              onClick={() => {
+                setActiveView(item.id);
+                setMenuOpen(false);
+              }}
             >
               <item.icon size={18} strokeWidth={1.8} />
               <span>{item.label}</span>
-              {item.active && <span className="nav-dot" />}
-            </a>
+              {activeView === item.id && <span className="nav-dot" />}
+            </button>
           ))}
         </nav>
 
@@ -148,17 +171,18 @@ export default function Home() {
         </div>
 
         <div className="sidebar-footer">
-          <a className="nav-item" href="#settings">
-            <Settings size={18} strokeWidth={1.8} />
-            <span>Settings</span>
-          </a>
+          <button className="nav-item" type="button" onClick={() => setActiveView("settings")}>
+            <Settings size={18} strokeWidth={1.8} /><span>Settings</span>
+          </button>
           <div className="profile-row">
-            <div className="avatar">MA</div>
+            <div className="avatar">{initials}</div>
             <div>
-              <strong>Maya Ahmed</strong>
-              <span>Undergraduate</span>
+              <strong>{profile.displayName}</strong>
+              <span className="capitalize">{studyLevel}</span>
             </div>
-            <MoreHorizontal size={18} />
+            <button className="profile-logout" type="button" onClick={() => void signOut()} aria-label="Sign out">
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </aside>
@@ -198,11 +222,14 @@ export default function Home() {
           </div>
         </header>
 
+        {activeView === "courses" ? (
+          <CoursesWorkspace userId={user.$id} />
+        ) : activeView === "today" ? (
         <div className="page-wrap">
           <section className="welcome-row">
             <div>
               <p className="eyebrow">Sunday, 19 July</p>
-              <h1>Good morning, Maya.</h1>
+              <h1>Good morning, {firstName}.</h1>
               <p>Your plan is balanced. One concept needs attention today.</p>
             </div>
             <button className="secondary-button" type="button">
@@ -419,20 +446,63 @@ export default function Home() {
           </section>
 
           <footer className="product-footer">
-            <span>Phase 1 foundation</span>
+            <span>Phase 2 · Account and course foundation</span>
             <span>Plan → Learn → Practice → Understand</span>
           </footer>
         </div>
+        ) : (
+          <ModulePreview view={activeView} onOpenCourses={() => setActiveView("courses")} />
+        )}
       </section>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {navigation.slice(0, 4).map((item) => (
-          <a className={item.active ? "active" : ""} href="#today" key={item.label}>
+          <button
+            className={activeView === item.id ? "active" : ""}
+            type="button"
+            key={item.label}
+            onClick={() => setActiveView(item.id)}
+          >
             <item.icon size={19} />
             <span>{item.label}</span>
-          </a>
+          </button>
         ))}
       </nav>
     </main>
+  );
+}
+
+function AppLoading() {
+  return (
+    <main className="app-loading">
+      <span className="brand-mark">C</span>
+      <LoaderCircle className="spin" size={21} />
+      <p>Connecting your learning workspace…</p>
+    </main>
+  );
+}
+
+function ModulePreview({ view, onOpenCourses }: { view: string; onOpenCourses: () => void }) {
+  const labels: Record<string, { title: string; description: string }> = {
+    planner: { title: "Adaptive study planner", description: "Your courses and availability will become a realistic daily and weekly plan." },
+    roadmaps: { title: "Learning roadmaps", description: "Turn goals into prerequisite-aware milestones, checkpoints, and dates." },
+    assignments: { title: "Assignment feedback", description: "Review work against its rubric and turn every issue into a learning step." },
+    practice: { title: "Practice and recall", description: "Generate quizzes and flashcards that strengthen the concepts needing attention." },
+    insights: { title: "Knowledge insights", description: "See explainable mastery signals and the evidence behind every detected gap." },
+    settings: { title: "Workspace settings", description: "Manage your learning preferences, privacy, messaging, and account." },
+  };
+  const content = labels[view] ?? labels.planner;
+
+  return (
+    <div className="page-wrap module-preview-page">
+      <section className="module-preview-card">
+        <span className="module-preview-icon"><Sparkles size={24} /></span>
+        <p className="eyebrow">Connected capability</p>
+        <h1>{content.title}</h1>
+        <p>{content.description}</p>
+        <div className="module-foundation-note"><Check size={16} /> Account and course foundations are ready. This capability activates in Phase 3.</div>
+        <button className="create-course-button" type="button" onClick={onOpenCourses}>Build your course library <ArrowRight size={16} /></button>
+      </section>
+    </div>
   );
 }

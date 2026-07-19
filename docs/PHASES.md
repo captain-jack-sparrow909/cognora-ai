@@ -1,6 +1,6 @@
 # Delivery phases
 
-## Phase 1 — Product foundation
+## Phase 1 — Product foundation ✅
 
 - Confirm the nine-capability product scope
 - Establish the frontend and responsive design system
@@ -8,13 +8,15 @@
 - Add Appwrite client and server configuration boundaries
 - Document product, architecture, and delivery phases
 
-## Phase 2 — Accounts and course foundation
+## Phase 2 — Accounts and course foundation ✅
 
 - Appwrite authentication and protected application shell
 - Student onboarding and learning preferences
 - Course creation and course dashboard
 - Private material uploads with processing states
 - Initial Appwrite tables, indexes, permissions, and storage buckets
+
+Delivered with Appwrite-backed email/password accounts, private onboarding profiles, live course creation, course workspaces, private uploads, and an idempotent provisioning workflow.
 
 ## Phase 3 — Core learning loop
 

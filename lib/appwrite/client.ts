@@ -10,6 +10,7 @@ function createServices() {
   const client = new Client().setEndpoint(config.endpoint).setProject(config.projectId);
 
   return {
+    config,
     account: new Account(client),
     tables: new TablesDB(client),
     storage: new Storage(client),
