@@ -4,7 +4,7 @@ Cognora AI is a personal learning operating system that connects planning, lectu
 
 ## Current product state
 
-Phase 5 provides:
+Phase 6 provides:
 
 - Appwrite email/password authentication
 - private student profiles and onboarding preferences
@@ -25,6 +25,11 @@ Phase 5 provides:
 - model, token, retry, and runtime observability without storing prompt content in operations records
 - server-side daily AI request guardrails and bounded retries
 - lazy-loaded workspaces, keyboard navigation, live regions, focus visibility, and reduced-motion support
+- an installable PWA shell with static-asset caching that leaves authenticated pages and APIs network-only
+- `.ics` study-plan export plus one-click Google Calendar and Outlook event handoff
+- opt-in, content-free product analytics and private founding-beta feedback
+- searchable material chunks and course-scoped Appwrite full-text retrieval for the AI coach
+- founding-beta cohort preferences and private feedback history
 
 Email reminder delivery is provider-ready but remains disabled until an Appwrite email provider and sender are connected.
 
@@ -42,7 +47,7 @@ Email reminder delivery is provider-ready but remains disabled until an Appwrite
 2. Install dependencies with `npm install`.
 3. Provision the Appwrite resources with `npm run appwrite:provision`.
 4. Deploy the learning function with `npm run appwrite:deploy-function`.
-5. Optionally validate the full temporary learning, intelligence, operations, and reminder loop with `npm run appwrite:smoke-learning`.
+5. Optionally validate the full temporary learning, intelligence, retrieval, beta, operations, and reminder loop with `npm run appwrite:smoke-learning`.
 6. Start the app with `npm run dev`.
 
 ## Validation

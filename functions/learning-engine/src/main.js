@@ -4,6 +4,23 @@ import { OfficeParser } from "officeparser";
 const MAX_SOURCE_CHARS = 60_000;
 const functionId = "learning-engine";
 
+function chunkSource(source, size = 2600, overlap = 300) {
+  const chunks = [];
+  let start = 0;
+  while (start < source.length && chunks.length < 40) {
+    let end = Math.min(source.length, start + size);
+    if (end < source.length) {
+      const boundary = Math.max(source.lastIndexOf("\n", end), source.lastIndexOf(". ", end));
+      if (boundary > start + Math.floor(size * 0.6)) end = boundary + 1;
+    }
+    const content = source.slice(start, end).trim();
+    if (content) chunks.push(content);
+    if (end >= source.length) break;
+    start = Math.max(start + 1, end - overlap);
+  }
+  return chunks;
+}
+
 function readJson(body) {
   if (!body) return {};
   if (typeof body === "object") return body;
@@ -220,10 +237,12 @@ async function processMaterial(services, body) {
 
     const now = new Date().toISOString();
     const permissions = userPermissions(userId);
+    const chunks = chunkSource(source);
     await Promise.all([
       deleteRows(tables, databaseId, "material_insights", [Query.equal("materialId", [materialId])]),
       deleteRows(tables, databaseId, "practice_items", [Query.equal("materialId", [materialId])]),
       deleteRows(tables, databaseId, "study_tasks", [Query.equal("materialId", [materialId]), Query.notEqual("source", ["adaptive-plan"])]),
+      deleteRows(tables, databaseId, "knowledge_chunks", [Query.equal("materialId", [materialId])]),
     ]);
     const oldConcepts = await tables.listRows({
       databaseId,
@@ -254,6 +273,16 @@ async function processMaterial(services, body) {
       },
       permissions,
     });
+
+    for (const [chunkIndex, content] of chunks.entries()) {
+      await tables.createRow({
+        databaseId,
+        tableId: "knowledge_chunks",
+        rowId: ID.unique(),
+        data: { ownerId: userId, courseId: material.courseId, materialId, chunkIndex, content, createdAt: now },
+        permissions,
+      });
+    }
 
     const conceptByTitle = new Map();
     for (const candidate of Array.isArray(data.concepts) ? data.concepts.slice(0, 10) : []) {
@@ -356,7 +385,7 @@ async function processMaterial(services, body) {
     }
 
     await tables.updateRow({ databaseId, tableId: "materials", rowId: materialId, data: { processingStatus: "ready" } });
-    return { ok: true, materialId, concepts: conceptByTitle.size, practiceItems: flashcards.length + quiz.length };
+    return { ok: true, materialId, chunks: chunks.length, concepts: conceptByTitle.size, practiceItems: flashcards.length + quiz.length };
   } catch (caught) {
     await tables.updateRow({ databaseId, tableId: "materials", rowId: materialId, data: { processingStatus: "failed" } }).catch(() => undefined);
     throw caught;
@@ -697,20 +726,30 @@ async function askCoach(services, body) {
     if (course.ownerId !== userId) throw new Error("This course does not belong to your account.");
   }
   const courseQueries = courseId ? [Query.equal("courseId", [courseId])] : [Query.equal("ownerId", [userId])];
-  const [profiles, concepts, gaps, tasks, insights, roadmaps] = await Promise.all([
+  const knowledgePromise = (async () => {
+    try {
+      const searched = await tables.listRows({ databaseId, tableId: "knowledge_chunks", queries: [...courseQueries, Query.search("content", message), Query.limit(8)] });
+      if (searched.rows.length) return searched;
+    } catch {
+      // Full-text search can be temporarily unavailable while a new index is building.
+    }
+    return tables.listRows({ databaseId, tableId: "knowledge_chunks", queries: [...courseQueries, Query.orderDesc("createdAt"), Query.limit(6)] });
+  })();
+  const [profiles, concepts, gaps, tasks, insights, roadmaps, knowledge] = await Promise.all([
     tables.listRows({ databaseId, tableId: "profiles", queries: [Query.equal("ownerId", [userId]), Query.limit(1)] }),
     tables.listRows({ databaseId, tableId: "concepts", queries: [...courseQueries, Query.orderAsc("mastery"), Query.limit(20)] }),
     tables.listRows({ databaseId, tableId: "gap_insights", queries: [...courseQueries, Query.limit(12)] }),
     tables.listRows({ databaseId, tableId: "study_tasks", queries: [...courseQueries, Query.equal("status", ["planned"]), Query.orderAsc("scheduledFor"), Query.limit(12)] }),
     tables.listRows({ databaseId, tableId: "material_insights", queries: [...courseQueries, Query.orderDesc("createdAt"), Query.limit(5)] }),
     tables.listRows({ databaseId, tableId: "roadmaps", queries: [...courseQueries, Query.equal("status", ["active"]), Query.limit(5)] }),
+    knowledgePromise,
   ]);
   const model = process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
   const { data, model: usedModel } = await callDeepSeek({
     services,
     model,
     system: "You are Cognora, a calm and evidence-aware AI study coach. Answer directly, give actionable next steps, and explain which course evidence supports your advice. Clearly say when the available evidence is insufficient. Do not claim to change schedules or grades.",
-    prompt: `Student profile: ${JSON.stringify(profiles.rows[0] || {})}. Selected course: ${JSON.stringify(course ? { id: course.$id, title: course.title, description: course.description, targetGrade: course.targetGrade } : null)}. Lowest-mastery concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ title: concept.title, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Gap insights: ${JSON.stringify(gaps.rows.map((gap) => ({ title: gap.title, severity: gap.severity, explanation: gap.explanation, recommendedAction: gap.recommendedAction })))}. Planned tasks: ${JSON.stringify(tasks.rows.map((task) => ({ title: task.title, scheduledFor: task.scheduledFor, durationMinutes: task.durationMinutes, reason: task.reason })))}. Material summaries: ${JSON.stringify(insights.rows.map((insight) => ({ title: insight.title, summary: insight.summary.slice(0, 1800) })))}. Active roadmaps: ${JSON.stringify(roadmaps.rows.map((roadmap) => ({ title: roadmap.title, goal: roadmap.goal, summary: roadmap.summary })))}. Student question: ${message}. Return {"answer":"clear coach response", "suggestedActions":["specific action"], "evidence":["course evidence used or an explicit insufficient-evidence note"]}.`,
+    prompt: `Student profile: ${JSON.stringify(profiles.rows[0] || {})}. Selected course: ${JSON.stringify(course ? { id: course.$id, title: course.title, description: course.description, targetGrade: course.targetGrade } : null)}. Lowest-mastery concepts: ${JSON.stringify(concepts.rows.map((concept) => ({ title: concept.title, mastery: concept.mastery || 0, evidenceCount: concept.evidenceCount || 0 })))}. Gap insights: ${JSON.stringify(gaps.rows.map((gap) => ({ title: gap.title, severity: gap.severity, explanation: gap.explanation, recommendedAction: gap.recommendedAction })))}. Planned tasks: ${JSON.stringify(tasks.rows.map((task) => ({ title: task.title, scheduledFor: task.scheduledFor, durationMinutes: task.durationMinutes, reason: task.reason })))}. Material summaries: ${JSON.stringify(insights.rows.map((insight) => ({ title: insight.title, summary: insight.summary.slice(0, 1800) })))}. Retrieved source passages: ${JSON.stringify(knowledge.rows.map((chunk) => ({ materialId: chunk.materialId, passage: chunk.content.slice(0, 2600) })))}. Active roadmaps: ${JSON.stringify(roadmaps.rows.map((roadmap) => ({ title: roadmap.title, goal: roadmap.goal, summary: roadmap.summary })))}. Student question: ${message}. Return {"answer":"clear coach response", "suggestedActions":["specific action"], "evidence":["course evidence used or an explicit insufficient-evidence note"]}.`,
     maxTokens: 3200,
   });
   const now = new Date().toISOString();

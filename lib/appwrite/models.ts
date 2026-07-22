@@ -248,3 +248,38 @@ export type ReminderPreferences = Models.Row & {
   quietEnd?: string;
   updatedAt: string;
 };
+
+export type KnowledgeChunk = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  materialId: string;
+  chunkIndex: number;
+  content: string;
+  createdAt: string;
+};
+
+export type BetaProfile = Models.Row & {
+  ownerId: string;
+  cohort: string;
+  analyticsEnabled: boolean;
+  joinedAt: string;
+  updatedAt: string;
+};
+
+export type AnalyticsEvent = Models.Row & {
+  ownerId: string;
+  eventName: string;
+  view?: string;
+  sessionId: string;
+  metadataJson: string;
+  createdAt: string;
+};
+
+export type ProductFeedback = Models.Row & {
+  ownerId: string;
+  category: "idea" | "confusing" | "bug" | "delight";
+  rating: number;
+  message: string;
+  status: "new" | "reviewed" | "planned" | "resolved";
+  createdAt: string;
+};

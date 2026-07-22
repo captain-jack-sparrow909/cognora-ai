@@ -46,10 +46,20 @@ Delivered with private assignment submissions, rubric-linked advisory feedback, 
 
 Delivered with private in-app reminders, realtime AI job progress, completion/failure notifications, token and runtime telemetry, bounded retries, a server-enforced daily request limit, accessible navigation and live regions, reduced-motion support, lazy-loaded workspaces, contract tests, and a full temporary-user Appwrite/DeepSeek smoke test. Email delivery is intentionally disabled until an Appwrite email provider and sender are configured.
 
-## Phase 6 — Beta growth and integrations
+## Phase 6 — Beta growth and integrations ✅
 
-- Connect an Appwrite email provider and verified sender
-- Calendar export and optional Google/Outlook sync
-- Product analytics, user feedback, and beta cohort tooling
-- Semantic retrieval for large multi-course libraries
-- Native mobile or installable PWA experience
+- Installable PWA experience
+- Calendar export and Google/Outlook event handoff
+- Consent-first product analytics, private feedback, and beta cohort tooling
+- Searchable source retrieval for larger multi-course libraries
+- Email provider readiness check
+
+Delivered with an installable PWA shell, safe static-asset caching, `.ics` export, direct Google Calendar and Outlook event creation, opt-in content-free analytics, private beta feedback, founding-beta cohort preferences, and Appwrite full-text retrieval across material chunks for grounded coaching. The live Appwrite project has no messaging provider configured, so email delivery remains intentionally disabled and accurately labeled instead of simulating delivery.
+
+## Phase 7 — Launch and scale
+
+- Configure a verified Appwrite email provider and production sender
+- Add two-way calendar OAuth sync and conflict handling
+- Introduce vector embeddings and hybrid semantic retrieval for very large libraries
+- Build a privacy-safe beta administration and release-health dashboard
+- Add custom domain, billing/entitlements, collaboration, and staged public launch controls

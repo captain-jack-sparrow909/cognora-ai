@@ -33,6 +33,8 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 import { OnboardingScreen } from "@/components/auth/onboarding-screen";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ActivityCenter, SettingsWorkspace } from "@/components/operations/operations-workspaces";
+import { PwaInstallButton } from "@/components/operations/pwa-install-button";
+import { trackProductEvent } from "@/lib/appwrite/product-analytics";
 
 const CoursesWorkspace = lazy(() => import("@/components/courses/courses-workspace").then((module) => ({ default: module.CoursesWorkspace })));
 const StudyPlannerWorkspace = lazy(() => import("@/components/learning/learning-workspaces").then((module) => ({ default: module.StudyPlannerWorkspace })));
@@ -124,6 +126,11 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!user?.$id || !profile) return;
+    void trackProductEvent(user.$id, "view_opened", activeView).catch(() => undefined);
+  }, [activeView, profile, user?.$id]);
 
   if (loading) return <AppLoading />;
   if (!user) return <AuthScreen />;
@@ -236,6 +243,7 @@ export default function Home() {
             <kbd>⌘ K</kbd>
           </label>
           <ActivityCenter userId={user.$id} onOpenSettings={() => setActiveView("settings")} />
+          <PwaInstallButton userId={user.$id} />
           <button className="help-button" type="button">
             <CircleHelp size={17} />
             Help
@@ -485,7 +493,7 @@ export default function Home() {
           </section>
 
           <footer className="product-footer">
-            <span>Phase 5 · Production ready</span>
+            <span>Phase 6 · Founding beta ready</span>
             <span>Plan → Learn → Practice → Understand</span>
           </footer>
         </div>
@@ -544,7 +552,7 @@ function ModulePreview({ view, onOpenCourses }: { view: string; onOpenCourses: (
         <p className="eyebrow">Connected capability</p>
         <h1>{content.title}</h1>
         <p>{content.description}</p>
-        <div className="module-foundation-note"><Check size={16} /> Cognora’s intelligence layer is active. Production hardening arrives in Phase 5.</div>
+        <div className="module-foundation-note"><Check size={16} /> Cognora’s intelligence layer, installable workspace, and founding beta loop are active.</div>
         <button className="create-course-button" type="button" onClick={onOpenCourses}>Build your course library <ArrowRight size={16} /></button>
       </section>
     </div>

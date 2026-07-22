@@ -1275,6 +1275,51 @@ a {
   }
 }
 
+/* Phase 6: installable beta, calendar portability, and consent-first growth */
+
+.install-button, .installed-chip { min-height: 39px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; color: var(--cobalt); border: 1px solid #d8dcf3; border-radius: 10px; background: #fafaff; font-size: 8px; font-weight: 750; white-space: nowrap; }
+.install-button { cursor: pointer; }
+.installed-chip { color: var(--teal); border-color: #bbe1da; background: var(--teal-soft); }
+.beta-growth-section { margin-top: 17px; }
+.beta-growth-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; margin: 25px 2px 15px; }
+.beta-growth-heading h2 { margin: 5px 0 7px; font: 500 25px/1.18 Georgia,serif; }
+.beta-growth-heading > div > p:last-child { max-width: 720px; margin: 0; color: var(--ink-soft); font-size: 10px; line-height: 1.55; }
+.beta-growth-heading > span { display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px; color: var(--teal); border: 1px solid #bbe1da; border-radius: 10px; background: var(--teal-soft); font-size: 8px; font-weight: 750; white-space: nowrap; }
+.beta-growth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.feedback-panel { grid-column: 1 / -1; }
+.calendar-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 0; border-bottom: 1px solid var(--line-soft); }
+.calendar-summary > div { display: grid; gap: 5px; }
+.calendar-summary strong { font-size: 11px; }
+.calendar-summary span { color: var(--ink-faint); font-size: 8px; }
+.calendar-summary button, .calendar-links a { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; color: #fff; border: 0; border-radius: 9px; background: var(--cobalt); cursor: pointer; font-size: 8px; font-weight: 750; }
+.calendar-summary button:disabled { opacity: .45; cursor: not-allowed; }
+.calendar-links { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.calendar-links p { width: 100%; margin: 0 0 2px; color: var(--ink-faint); font-size: 8px; }
+.calendar-links a { color: var(--cobalt); border: 1px solid #d8dcf3; background: #fafaff; }
+.beta-status { display: flex; align-items: center; gap: 9px; margin-top: 15px; padding: 13px; color: var(--teal); border-radius: 10px; background: var(--teal-soft); }
+.beta-status > div { display: grid; gap: 4px; }
+.beta-status strong { color: #315e5b; font-size: 9px; }
+.beta-status span { color: #56847d; font-size: 8px; }
+.feedback-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 17px; }
+.feedback-panel > label { margin-top: 12px; }
+.feedback-panel select, .feedback-panel textarea { width: 100%; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 9px; background: #fff; font: inherit; font-size: 9px; }
+.feedback-panel select { height: 40px; padding: 0 11px; }
+.feedback-panel textarea { min-height: 94px; resize: vertical; padding: 11px; line-height: 1.55; }
+.feedback-panel .dialog-submit { margin-top: 13px; }
+.feedback-history { margin: 12px 0 0; color: var(--ink-faint); font-size: 8px; text-transform: capitalize; }
+
+@media (max-width: 900px) {
+  .beta-growth-grid { grid-template-columns: 1fr; }
+  .feedback-panel { grid-column: auto; }
+}
+
+@media (max-width: 680px) {
+  .install-button, .installed-chip { display: none; }
+  .beta-growth-heading { align-items: flex-start; flex-direction: column; }
+  .feedback-fields { grid-template-columns: 1fr; }
+  .calendar-summary { align-items: flex-start; flex-direction: column; }
+}
+
 /* Phase 2: account, onboarding, courses, and private materials */
 
 .primary-nav button.nav-item,

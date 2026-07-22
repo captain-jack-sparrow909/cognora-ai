@@ -447,6 +447,70 @@ const definitions = [
       { key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] },
     ],
   },
+  {
+    id: "knowledge_chunks",
+    name: "Searchable material knowledge chunks",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "materialId", type: "varchar", size: 36, required: true },
+      { key: "chunkIndex", type: "integer", min: 0, max: 500, required: true },
+      { key: "content", type: "text", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "material_chunk", type: TablesDBIndexType.Unique, columns: ["materialId", "chunkIndex"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "content_search", type: TablesDBIndexType.Fulltext, columns: ["content"] },
+    ],
+  },
+  {
+    id: "beta_profiles",
+    name: "Private beta preferences",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "cohort", type: "varchar", size: 64, required: true },
+      { key: "analyticsEnabled", type: "boolean", required: false, default: false },
+      { key: "joinedAt", type: "datetime", required: true },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] },
+      { key: "cohort_joined", type: TablesDBIndexType.Key, columns: ["cohort", "joinedAt"] },
+    ],
+  },
+  {
+    id: "analytics_events",
+    name: "Privacy-safe product analytics",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "eventName", type: "varchar", size: 64, required: true },
+      { key: "view", type: "varchar", size: 48, required: false },
+      { key: "sessionId", type: "varchar", size: 36, required: true },
+      { key: "metadataJson", type: "text", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_created", type: TablesDBIndexType.Key, columns: ["ownerId", "createdAt"] },
+      { key: "event_created", type: TablesDBIndexType.Key, columns: ["eventName", "createdAt"] },
+    ],
+  },
+  {
+    id: "product_feedback",
+    name: "Private beta feedback",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "category", type: "enum", elements: ["idea", "confusing", "bug", "delight"], required: true },
+      { key: "rating", type: "integer", min: 1, max: 5, required: true },
+      { key: "message", type: "text", required: true },
+      { key: "status", type: "enum", elements: ["new", "reviewed", "planned", "resolved"], required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_created", type: TablesDBIndexType.Key, columns: ["ownerId", "createdAt"] },
+      { key: "status_created", type: TablesDBIndexType.Key, columns: ["status", "createdAt"] },
+    ],
+  },
 ];
 
 function isNotFound(error) {
@@ -649,4 +713,4 @@ try {
 }
 
 console.log("Secured bucket: course-materials");
-console.log("Appwrite Phase 5 resources are ready.");
+console.log("Appwrite Phase 6 resources are ready.");

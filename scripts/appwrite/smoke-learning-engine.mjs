@@ -101,9 +101,9 @@ try {
   const password = `Cg!${randomBytes(18).toString("base64url")}`;
   await users.create({
     userId: created.userId,
-    email: `phase5-smoke-${Date.now()}@example.test`,
+    email: `phase6-smoke-${Date.now()}@example.test`,
     password,
-    name: "Phase 5 smoke test",
+    name: "Phase 6 smoke test",
   });
   const session = await users.createSession({ userId: created.userId });
   const jwt = await users.createJWT({ userId: created.userId, sessionId: session.$id, duration: 900 });
@@ -136,7 +136,7 @@ try {
       code: "BIO-SMOKE",
       color: "teal",
       term: "Validation",
-      description: "Temporary Phase 5 production-loop validation.",
+      description: "Temporary Phase 6 beta-loop validation.",
       targetGrade: "A",
       status: "active",
       createdAt: now,
@@ -150,7 +150,7 @@ try {
     rowId: ID.unique(),
     data: {
       ownerId: created.userId,
-      displayName: "Phase 5 smoke test",
+      displayName: "Phase 6 smoke test",
       studyLevel: "undergraduate",
       timezone: "Asia/Dubai",
       weeklyHours: 5,
@@ -207,6 +207,17 @@ try {
     },
     permissions,
   });
+  await tables.createRow({
+    databaseId,
+    tableId: "beta_profiles",
+    rowId: created.userId,
+    data: { ownerId: created.userId, cohort: "phase6-validation", analyticsEnabled: true, joinedAt: now, updatedAt: now },
+    permissions,
+  });
+  await Promise.all([
+    tables.createRow({ databaseId, tableId: "analytics_events", rowId: ID.unique(), data: { ownerId: created.userId, eventName: "view_opened", view: "settings", sessionId: ID.unique(), metadataJson: "{}", createdAt: now }, permissions }),
+    tables.createRow({ databaseId, tableId: "product_feedback", rowId: ID.unique(), data: { ownerId: created.userId, category: "delight", rating: 5, message: "Phase 6 validation feedback.", status: "new", createdAt: now }, permissions }),
+  ]);
 
   await runAction(functions, ExecutionMethod, { action: "process_material", materialId: created.materialId }, true, async () => {
     const row = await tables.getRow({ databaseId, tableId: "materials", rowId: created.materialId });
@@ -218,14 +229,15 @@ try {
     return rows.rows.length > 0;
   }, operationContext);
 
-  const [insights, concepts, tasks, practice] = await Promise.all([
+  const [insights, concepts, tasks, practice, chunks] = await Promise.all([
     tables.listRows({ databaseId, tableId: "material_insights", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "concepts", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "study_tasks", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "practice_items", queries: [Query.equal("courseId", [created.courseId])] }),
+    tables.listRows({ databaseId, tableId: "knowledge_chunks", queries: [Query.equal("courseId", [created.courseId])] }),
   ]);
   const quiz = practice.rows.find((item) => item.itemType === "multiple-choice");
-  if (!insights.rows.length || !concepts.rows.length || !tasks.rows.length || !quiz) throw new Error("The function completed without producing the full learning loop.");
+  if (!insights.rows.length || !concepts.rows.length || !tasks.rows.length || !quiz || !chunks.rows.length) throw new Error("The function completed without producing the full searchable learning loop.");
   const attempt = await runAction(functions, ExecutionMethod, { action: "submit_attempt", itemId: quiz.$id, response: quiz.answer, confidence: 4 }, false);
 
   const assignmentId = ID.unique();
@@ -289,7 +301,7 @@ try {
     return rows.rows.length > 0;
   }, operationContext);
 
-  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications] = await Promise.all([
+  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback] = await Promise.all([
     tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] }),
@@ -297,12 +309,16 @@ try {
     tables.listRows({ databaseId, tableId: "coach_messages", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.equal("ownerId", [created.userId])] }),
     tables.listRows({ databaseId, tableId: "notifications", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "beta_profiles", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "analytics_events", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "product_feedback", queries: [Query.equal("ownerId", [created.userId])] }),
   ]);
   if (!reports.rows.length || !gapRows.rows.length || !roadmaps.rows.length || !roadmapSteps.rows.length || !coachMessages.rows.length) {
     throw new Error("The Phase 4 function actions completed without persisting the full intelligence loop.");
   }
   if (aiJobs.rows.length !== 6 || aiJobs.rows.some((job) => job.status !== "completed" || job.progress !== 100 || !job.durationMs || !job.model)) throw new Error("Phase 5 AI job observability did not record complete operational metadata.");
   if (!notifications.rows.some((notification) => notification.type === "ai-complete") || !notifications.rows.some((notification) => notification.type === "reminder")) throw new Error("Phase 5 notifications did not include both AI completion and study reminders.");
+  if (!betaProfiles.rows[0]?.analyticsEnabled || !analyticsEvents.rows.length || !productFeedback.rows.length) throw new Error("Phase 6 beta consent, analytics, and feedback records were not persisted.");
   console.log(JSON.stringify({
     function: functionId,
     materialStatus: "ready",
@@ -310,6 +326,7 @@ try {
     concepts: concepts.rows.length,
     tasks: tasks.rows.length,
     practiceItems: practice.rows.length,
+    knowledgeChunks: chunks.rows.length,
     scoredAttempt: attempt.correct,
     masteryAfter: attempt.masteryAfter,
     feedbackScore: reports.rows[0].advisoryScore,
@@ -320,11 +337,14 @@ try {
     recordedPromptTokens: aiJobs.rows.reduce((total, job) => total + (job.promptTokens || 0), 0),
     notifications: notifications.rows.length,
     reminderSynced: notifications.rows.some((notification) => notification.type === "reminder"),
+    betaCohort: betaProfiles.rows[0].cohort,
+    analyticsEvents: analyticsEvents.rows.length,
+    productFeedback: productFeedback.rows.length,
   }, null, 2));
 } finally {
   if (created.courseId) {
-    for (const tableId of ["notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
-      const ownerScoped = ["notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
+    for (const tableId of ["product_feedback", "analytics_events", "beta_profiles", "knowledge_chunks", "notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
+      const ownerScoped = ["product_feedback", "analytics_events", "beta_profiles", "notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
       const actualField = ownerScoped ? "ownerId" : "courseId";
       const value = ownerScoped ? created.userId : created.courseId;
       await deleteMatching(tableId, [Query.equal(actualField, [value])]).catch(() => undefined);

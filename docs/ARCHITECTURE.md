@@ -51,6 +51,13 @@
 - `notifications`: private study reminders plus AI completion and failure activity
 - `reminder_preferences`: one private in-app schedule and quiet-hours record per learner
 
+### Phase 6 tables — provisioned
+
+- `knowledge_chunks`: private material passages with course ownership and full-text search
+- `beta_profiles`: one private cohort and analytics-consent record per learner
+- `analytics_events`: private allowlisted product events without course or AI content
+- `product_feedback`: private beta ratings, categories, messages, and triage state
+
 ### Planned tables
 
 `course_members`, `lectures`, `concept_relationships`, `study_sessions`, and `assessments`.
@@ -70,7 +77,7 @@
 - `generate-roadmap`: implemented as the `generate_roadmap` action
 - `review-assignment`: implemented as the `review_assignment` action
 - `detect-gaps`: implemented as the `detect_gaps` action with explicit evidence and missing-evidence handling
-- `ask-coach`: implemented as the `ask_coach` action grounded in profile, course, concepts, gaps, plan, materials, and roadmap
+- `ask-coach`: implemented as the `ask_coach` action grounded in profile, course, concepts, gaps, plan, full-text-retrieved source chunks, materials, and roadmap
 - `update-mastery`: implemented as the `submit_attempt` action
 - `sync-reminders`: implemented as the `sync_reminders` action, translating planned tasks into private scheduled in-app notifications
 - `deepseek-gateway`: the learning engine owns normalized JSON model access, one bounded retry for transient failures, token accounting, structured operational logs, and a configurable daily request limit
@@ -83,4 +90,4 @@ In-app reminders and activity are live. Email delivery remains off until an Appw
 
 ## Retrieval approach
 
-The first version uses course-scoped text chunks and Appwrite full-text search. Semantic vector search can be added later through an external vector store connected by an Appwrite Function, while Appwrite remains the system of record.
+Phase 6 uses course-scoped text chunks and Appwrite full-text search with a recent-source fallback. Hybrid semantic vector search can be added later through an external vector store connected by an Appwrite Function, while Appwrite remains the system of record.

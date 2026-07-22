@@ -22,6 +22,7 @@ import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
 import { executeLearningAction } from "@/lib/appwrite/learning-engine";
 import type { AiJob, LearnerNotification, ReminderPreferences } from "@/lib/appwrite/models";
 import { privateUserPermissions } from "@/lib/appwrite/permissions";
+import { BetaGrowthWorkspace } from "@/components/operations/beta-growth-workspace";
 
 function relativeTime(value: string) {
   const delta = Date.now() - new Date(value).getTime();
@@ -169,7 +170,7 @@ export function SettingsWorkspace({ userId, timezone }: { userId: string; timezo
   return <div className="page-wrap operations-page">
     <section className="workspace-page-heading"><div><p className="eyebrow">Settings and operations</p><h1>Reminders that respect your attention</h1><p>Control in-app study prompts and review private AI usage signals without exposing course content.</p></div></section>
     {error && <p className="workspace-error" role="alert">{error}</p>}{message && <p className="workspace-success" role="status">{message}</p>}
-    {loading ? <div className="workspace-loading"><LoaderCircle className="spin" size={20} />Loading preferences…</div> : <div className="settings-grid">
+    {loading ? <div className="workspace-loading"><LoaderCircle className="spin" size={20} />Loading preferences…</div> : <><div className="settings-grid">
       <form className="settings-panel reminder-settings" onSubmit={save}>
         <header><span><BellRing size={19} /></span><div><p className="card-kicker">Study reminders</p><h2>In-app schedule</h2></div></header>
         <label className="toggle-row"><span><strong>In-app reminders</strong><small>Show planned sessions and completed AI work in Cognora.</small></span><input name="inAppEnabled" type="checkbox" defaultChecked={preferences?.inAppEnabled ?? true} /></label>
@@ -186,6 +187,6 @@ export function SettingsWorkspace({ userId, timezone }: { userId: string; timezo
         <p className="operations-note"><ShieldCheck size={15} />Operational records contain status, duration, model, and token totals—not submission text or AI responses. The daily request guardrail is enforced server-side.</p>
         {failed.length > 0 && <p className="failure-note"><TriangleAlert size={14} />{failed.length} recent {failed.length === 1 ? "job needs" : "jobs need"} attention. Existing learning data remains intact.</p>}
       </section>
-    </div>}
+    </div><BetaGrowthWorkspace userId={userId} /></>}
   </div>;
 }
