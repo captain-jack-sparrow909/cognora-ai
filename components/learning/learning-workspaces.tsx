@@ -16,6 +16,7 @@ import {
   LoaderCircle,
   RefreshCw,
   RotateCcw,
+  ShieldCheck,
   Sparkles,
   Target,
   WandSparkles,
@@ -61,9 +62,9 @@ function masteryLabel(value: number) {
   return "No evidence yet";
 }
 
-async function loadCourseLearningData(userId: string, courseId: string): Promise<LearningData> {
+async function loadCourseLearningData(_userId: string, courseId: string): Promise<LearningData> {
   const { tables, config } = getAppwriteBrowserServices();
-  const common = [Query.equal("ownerId", [userId]), Query.equal("courseId", [courseId])];
+  const common = [Query.equal("courseId", [courseId])];
   const [insights, concepts, tasks, practice] = await Promise.all([
     tables.listRows<MaterialInsight>({ databaseId: config.databaseId, tableId: "material_insights", queries: [...common, Query.orderDesc("createdAt"), Query.limit(20)], ttl: 0 }),
     tables.listRows<CourseConcept>({ databaseId: config.databaseId, tableId: "concepts", queries: [...common, Query.orderAsc("mastery"), Query.limit(100)], ttl: 0 }),
@@ -78,11 +79,13 @@ export function CourseLearningLoop({
   course,
   materials,
   onMaterialsChanged,
+  readOnly = false,
 }: {
   userId: string;
   course: Course;
   materials: CourseMaterial[];
   onMaterialsChanged: () => Promise<void>;
+  readOnly?: boolean;
 }) {
   const [data, setData] = useState<LearningData>({ insights: [], concepts: [], tasks: [], practice: [] });
   const [activeTab, setActiveTab] = useState<"companion" | "planner" | "practice">("companion");
@@ -159,7 +162,7 @@ export function CourseLearningLoop({
           <div className="ai-material-row" key={material.$id}>
             <span className={`ai-status-dot ${material.processingStatus}`} />
             <div><strong>{material.name}</strong><span>{material.kind} · {material.processingStatus}</span></div>
-            <button
+            {!readOnly && <button
               className="ai-action-button"
               type="button"
               disabled={Boolean(busyId)}
@@ -167,7 +170,7 @@ export function CourseLearningLoop({
             >
               {busyId === material.$id ? <LoaderCircle className="spin" size={15} /> : material.processingStatus === "ready" ? <RefreshCw size={14} /> : <WandSparkles size={15} />}
               {busyId === material.$id ? "Analyzing…" : material.processingStatus === "ready" ? "Analyze again" : "Analyze with AI"}
-            </button>
+            </button>}
           </div>
         ))}
       </div>
@@ -183,9 +186,9 @@ export function CourseLearningLoop({
       ) : activeTab === "companion" ? (
         <CompanionPanel insight={latestInsight} concepts={data.concepts} />
       ) : activeTab === "planner" ? (
-        <PlannerPanel tasks={data.tasks} concepts={data.concepts} busy={busyId === "plan"} onGenerate={() => void generatePlan()} />
+        <PlannerPanel tasks={data.tasks} concepts={data.concepts} busy={busyId === "plan"} onGenerate={() => void generatePlan()} readOnly={readOnly} />
       ) : (
-        <PracticePanel items={data.practice} onEvidence={reload} />
+        <PracticePanel items={data.practice} onEvidence={reload} readOnly={readOnly} />
       )}
     </section>
   );
@@ -221,12 +224,12 @@ function CompanionPanel({ insight, concepts }: { insight?: MaterialInsight; conc
   );
 }
 
-function PlannerPanel({ tasks, concepts, busy, onGenerate }: { tasks: StudyTask[]; concepts: CourseConcept[]; busy: boolean; onGenerate: () => void }) {
+function PlannerPanel({ tasks, concepts, busy, onGenerate, readOnly = false }: { tasks: StudyTask[]; concepts: CourseConcept[]; busy: boolean; onGenerate: () => void; readOnly?: boolean }) {
   return (
     <div className="learning-panel planner-panel">
       <div className="learning-panel-heading">
         <div><p className="card-kicker">Adaptive seven-day plan</p><h3>Study the right thing next</h3></div>
-        <button className="ai-action-button primary" type="button" disabled={busy || concepts.length === 0} onClick={onGenerate}>{busy ? <LoaderCircle className="spin" size={15} /> : <Sparkles size={15} />}{busy ? "Building plan…" : tasks.length ? "Rebalance plan" : "Generate plan"}</button>
+        {!readOnly && <button className="ai-action-button primary" type="button" disabled={busy || concepts.length === 0} onClick={onGenerate}>{busy ? <LoaderCircle className="spin" size={15} /> : <Sparkles size={15} />}{busy ? "Building plan…" : tasks.length ? "Rebalance plan" : "Generate plan"}</button>}
       </div>
       {tasks.length === 0 ? <LearningEmpty icon={CalendarDays} title="No study sessions yet" copy="Analyze material first, then Cognora will balance a realistic week around the concepts with the least evidence." /> : (
         <div className="adaptive-task-list">{tasks.map((task, index) => (
@@ -241,7 +244,7 @@ function PlannerPanel({ tasks, concepts, busy, onGenerate }: { tasks: StudyTask[
   );
 }
 
-function PracticePanel({ items, onEvidence }: { items: PracticeItem[]; onEvidence: () => Promise<void> }) {
+function PracticePanel({ items, onEvidence, readOnly = false }: { items: PracticeItem[]; onEvidence: () => Promise<void>; readOnly?: boolean }) {
   const quiz = items.filter((item) => item.itemType === "multiple-choice");
   const flashcards = items.filter((item) => item.itemType === "flashcard");
   const [mode, setMode] = useState<"quiz" | "flashcards">(quiz.length ? "quiz" : "flashcards");
@@ -249,7 +252,7 @@ function PracticePanel({ items, onEvidence }: { items: PracticeItem[]; onEvidenc
   return (
     <div className="learning-panel practice-panel">
       <div className="learning-panel-heading"><div><p className="card-kicker">Practice and recall</p><h3>Convert understanding into evidence</h3></div><div className="practice-mode"><button className={mode === "quiz" ? "active" : ""} type="button" disabled={!quiz.length} onClick={() => setMode("quiz")}>Quiz · {quiz.length}</button><button className={mode === "flashcards" ? "active" : ""} type="button" disabled={!flashcards.length} onClick={() => setMode("flashcards")}>Cards · {flashcards.length}</button></div></div>
-      {mode === "quiz" ? <QuizRunner items={quiz} onEvidence={onEvidence} /> : <FlashcardRunner items={flashcards} />}
+      {readOnly ? <div className="operations-note"><ShieldCheck size={14} />Shared practice is preview-only so each learner keeps separate mastery evidence.</div> : mode === "quiz" ? <QuizRunner items={quiz} onEvidence={onEvidence} /> : <FlashcardRunner items={flashcards} />}
     </div>
   );
 }

@@ -15,9 +15,18 @@ type LearningAction =
   | { action: "ask_coach"; courseId?: string; message: string }
   | { action: "sync_reminders" }
   | { action: "get_launch_snapshot" }
-  | { action: "claim_launch_admin" };
+  | { action: "claim_launch_admin" }
+  | { action: "create_course_invite"; courseId: string; role: "editor" | "viewer"; maxUses?: number; expiresInDays?: number }
+  | { action: "accept_course_invite"; inviteCode: string }
+  | { action: "create_launch_cohort"; name: string; maxMembers: number }
+  | { action: "join_launch_cohort"; cohortCode: string }
+  | { action: "run_launch_review" };
 
-const jobLabels: Record<Exclude<LearningAction["action"], "submit_attempt" | "sync_reminders" | "get_launch_snapshot" | "claim_launch_admin">, string> = {
+type InstantAction = "submit_attempt" | "sync_reminders" | "get_launch_snapshot" | "claim_launch_admin" | "create_course_invite" | "accept_course_invite" | "create_launch_cohort" | "join_launch_cohort" | "run_launch_review";
+
+const instantActions: LearningAction["action"][] = ["submit_attempt", "sync_reminders", "get_launch_snapshot", "claim_launch_admin", "create_course_invite", "accept_course_invite", "create_launch_cohort", "join_launch_cohort", "run_launch_review"];
+
+const jobLabels: Record<Exclude<LearningAction["action"], InstantAction>, string> = {
   process_material: "Analyzing course material",
   generate_plan: "Building an adaptive plan",
   review_assignment: "Reviewing an assignment",
@@ -39,7 +48,7 @@ function jobContext(action: LearningAction) {
 
 export async function executeLearningAction<T>(action: LearningAction): Promise<T> {
   const { account, client, functions, tables, config } = getAppwriteBrowserServices();
-  const runAsync = !["submit_attempt", "sync_reminders", "get_launch_snapshot", "claim_launch_admin"].includes(action.action);
+  const runAsync = !instantActions.includes(action.action);
   let jobId: string | undefined;
   let unsubscribe: (() => void) | undefined;
   let requestBody: LearningAction & { jobId?: string } = action;

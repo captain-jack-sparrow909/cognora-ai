@@ -48,7 +48,7 @@ const settings = {
   logging: true,
   entrypoint: "src/main.js",
   commands: "npm install",
-  scopes: [ProjectKeyScopes.RowsRead, ProjectKeyScopes.RowsWrite, ProjectKeyScopes.FilesRead, ProjectKeyScopes.UsersRead, ProjectKeyScopes.MessagesWrite],
+  scopes: [ProjectKeyScopes.RowsRead, ProjectKeyScopes.RowsWrite, ProjectKeyScopes.FilesRead, ProjectKeyScopes.FilesWrite, ProjectKeyScopes.UsersRead, ProjectKeyScopes.MessagesWrite],
 };
 
 if (current) {

@@ -324,6 +324,39 @@ export type CourseMember = Models.Row & {
   joinedAt: string;
 };
 
+export type CourseInviteResult = {
+  ok: boolean;
+  inviteCode: string;
+  role: "editor" | "viewer";
+  maxUses: number;
+  expiresAt: string;
+  courseTitle: string;
+};
+
+export type CourseInviteAcceptance = {
+  ok: boolean;
+  courseId: string;
+  courseTitle: string;
+  role: "editor" | "viewer";
+};
+
+export type LaunchCohortResult = {
+  ok: boolean;
+  cohortId: string;
+  cohortName: string;
+  cohortCode: string;
+  maxMembers: number;
+};
+
+export type LaunchReview = {
+  ok: boolean;
+  privatePilotReady: boolean;
+  publicLaunchReady: boolean;
+  checks: Array<{ key: string; label: string; passed: boolean }>;
+  integrations: LaunchSnapshot["integrations"];
+  reviewedAt: string;
+};
+
 export type LaunchSnapshot = {
   ok: boolean;
   isAdmin: boolean;
@@ -348,5 +381,8 @@ export type LaunchSnapshot = {
     feedback: number;
     aiJobsToday: number;
     failedJobsToday: number;
+    activeInvites: number;
+    cohortMembers: number;
+    securityWarningsToday: number;
   };
 };

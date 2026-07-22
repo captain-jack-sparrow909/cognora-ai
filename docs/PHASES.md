@@ -67,11 +67,22 @@ Delivered with an installable PWA shell, safe static-asset caching, `.ics` expor
 
 Delivered with account-level AI, storage, and collaboration limits; live usage meters; staged release channels; course membership roles; calendar sync-state and conflict-policy records; optional OpenAI-compatible embeddings with full-text fallback; provider-ready email delivery; and an owner-claimable administration dashboard that exposes aggregate counts without learner content. Appwrite production and localhost origins are registered. External provider switches remain off because email, Google, Microsoft, Stripe, embedding, custom-domain credentials, and DNS are not configured.
 
-## Phase 8 — Provider activation and public launch
+## Phase 8 — Launch gate and controlled collaboration ✅
+
+- Server-verified, expiring course invitation codes with viewer/editor roles and bounded uses
+- Shared course materials and learning intelligence without exposing personal attempts, mastery, submissions, feedback, or coaching history
+- Controlled founding-cohort codes, capacity limits, and private enrollment
+- Content-free security audit events for invitation, enrollment, rejected-code, and launch-review activity
+- Private-pilot and public-launch readiness checks with external providers treated as hard gates
+- A repeatable concurrent Appwrite Function load check for the launch dashboard
+
+Delivered without weakening the private deployment. Invitation and cohort secrets are returned once, stored only as SHA-256 hashes, and verified inside the Appwrite Function. Course permissions are refreshed server-side when a learner joins. The launch review distinguishes a safe private pilot from a public launch and cannot enable public access. Email, Google, Microsoft, Stripe, embeddings, and custom-domain readiness remain off until their real credentials and DNS are supplied.
+
+## Phase 9 — External activation and public launch
 
 - Connect and verify the Appwrite email sender
 - Supply Google and Microsoft OAuth credentials and activate two-way calendar sync
 - Choose an embedding provider and backfill existing material vectors
 - Connect Stripe plans, checkout, webhooks, and entitlement lifecycle updates
 - Add the production custom domain and complete DNS/SSL validation
-- Turn on collaboration invitations, conduct a security/load review, and stage the first public cohort
+- Run the final security/load review, approve the first cohort, and explicitly change the Sites access policy

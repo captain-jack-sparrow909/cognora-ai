@@ -22,7 +22,7 @@ const databaseId = process.env.APPWRITE_DATABASE_ID;
 const bucketId = process.env.APPWRITE_MATERIALS_BUCKET_ID;
 const submissionsBucketId = process.env.APPWRITE_SUBMISSIONS_BUCKET_ID;
 const functionId = process.env.NEXT_PUBLIC_APPWRITE_LEARNING_FUNCTION_ID || "learning-engine";
-const created = { userId: ID.unique(), courseId: "", materialId: "", fileId: "", submissionFileId: "" };
+const created = { userId: ID.unique(), memberUserId: ID.unique(), courseId: "", materialId: "", fileId: "", submissionFileId: "", cohortId: "" };
 
 async function deleteMatching(tableId, queries) {
   const result = await adminTables.listRows({ databaseId, tableId, queries: [...queries, Query.limit(100)] });
@@ -101,10 +101,12 @@ try {
   const password = `Cg!${randomBytes(18).toString("base64url")}`;
   await users.create({
     userId: created.userId,
-    email: `phase7-smoke-${Date.now()}@example.test`,
+    email: `phase8-smoke-${Date.now()}@example.test`,
     password,
-    name: "Phase 7 smoke test",
+    name: "Phase 8 smoke test",
   });
+  const memberPassword = `Cg!${randomBytes(18).toString("base64url")}`;
+  await users.create({ userId: created.memberUserId, email: `phase8-member-${Date.now()}@example.test`, password: memberPassword, name: "Phase 8 collaboration member" });
   const session = await users.createSession({ userId: created.userId });
   const jwt = await users.createJWT({ userId: created.userId, sessionId: session.$id, duration: 900 });
   const userClient = new Client()
@@ -119,6 +121,12 @@ try {
     .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID)
     .setSession(session.secret);
   const functions = new WebFunctions(webClient);
+  const memberSession = await users.createSession({ userId: created.memberUserId });
+  const memberJwt = await users.createJWT({ userId: created.memberUserId, sessionId: memberSession.$id, duration: 900 });
+  const memberClient = new Client().setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT).setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID).setJWT(memberJwt.jwt);
+  const memberTables = new TablesDB(memberClient);
+  const memberWebClient = new WebClient().setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT).setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID).setSession(memberSession.secret);
+  const memberFunctions = new WebFunctions(memberWebClient);
   const permissions = [
     Permission.read(Role.user(created.userId)),
     Permission.update(Role.user(created.userId)),
@@ -136,7 +144,7 @@ try {
       code: "BIO-SMOKE",
       color: "teal",
       term: "Validation",
-      description: "Temporary Phase 7 launch-loop validation.",
+      description: "Temporary Phase 8 launch-gate validation.",
       targetGrade: "A",
       status: "active",
       createdAt: now,
@@ -150,7 +158,7 @@ try {
     rowId: ID.unique(),
     data: {
       ownerId: created.userId,
-      displayName: "Phase 7 smoke test",
+      displayName: "Phase 8 smoke test",
       studyLevel: "undergraduate",
       timezone: "Asia/Dubai",
       weeklyHours: 5,
@@ -305,8 +313,19 @@ try {
     return rows.rows.length > 0;
   }, operationContext);
   const launchSnapshot = await runAction(functions, ExecutionMethod, { action: "claim_launch_admin" }, false);
+  const invite = await runAction(functions, ExecutionMethod, { action: "create_course_invite", courseId: created.courseId, role: "viewer", maxUses: 1, expiresInDays: 7 }, false);
+  const accepted = await runAction(memberFunctions, ExecutionMethod, { action: "accept_course_invite", inviteCode: invite.inviteCode }, false);
+  const cohort = await runAction(functions, ExecutionMethod, { action: "create_launch_cohort", name: "Phase 8 validation cohort", maxMembers: 5 }, false);
+  created.cohortId = cohort.cohortId;
+  const cohortJoin = await runAction(memberFunctions, ExecutionMethod, { action: "join_launch_cohort", cohortCode: cohort.cohortCode }, false);
+  const launchReview = await runAction(functions, ExecutionMethod, { action: "run_launch_review" }, false);
+  const [sharedCourse, sharedMaterials] = await Promise.all([
+    memberTables.getRow({ databaseId, tableId: "courses", rowId: created.courseId }),
+    memberTables.listRows({ databaseId, tableId: "materials", queries: [Query.equal("courseId", [created.courseId]), Query.limit(10)] }),
+  ]);
+  if (accepted.courseId !== created.courseId || sharedCourse.$id !== created.courseId || !sharedMaterials.rows.length || cohortJoin.cohortId !== cohort.cohortId || !Array.isArray(launchReview.checks)) throw new Error("Phase 8 collaboration, cohort, or launch-review flow failed.");
 
-  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback, entitlements, launchPreferences, calendarConnections, courseMembers] = await Promise.all([
+  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback, entitlements, launchPreferences, calendarConnections, courseMembers, courseInvites, cohortMemberships, securityEvents] = await Promise.all([
     tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] }),
@@ -321,6 +340,9 @@ try {
     tables.listRows({ databaseId, tableId: "launch_preferences", queries: [Query.equal("ownerId", [created.userId])] }),
     tables.listRows({ databaseId, tableId: "calendar_connections", queries: [Query.equal("ownerId", [created.userId])] }),
     tables.listRows({ databaseId, tableId: "course_members", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "course_invites", queries: [Query.equal("ownerId", [created.userId])] }),
+    adminTables.listRows({ databaseId, tableId: "cohort_memberships", queries: [Query.equal("cohortId", [cohort.cohortId])] }),
+    adminTables.listRows({ databaseId, tableId: "security_events", queries: [Query.equal("targetId", [created.courseId])] }),
   ]);
   if (!reports.rows.length || !gapRows.rows.length || !roadmaps.rows.length || !roadmapSteps.rows.length || !coachMessages.rows.length) {
     throw new Error("The Phase 4 function actions completed without persisting the full intelligence loop.");
@@ -329,6 +351,7 @@ try {
   if (!notifications.rows.some((notification) => notification.type === "ai-complete") || !notifications.rows.some((notification) => notification.type === "reminder")) throw new Error("Phase 5 notifications did not include both AI completion and study reminders.");
   if (!betaProfiles.rows[0]?.analyticsEnabled || !analyticsEvents.rows.length || !productFeedback.rows.length) throw new Error("Phase 6 beta consent, analytics, and feedback records were not persisted.");
   if (!entitlements.rows.length || !launchPreferences.rows.length || !calendarConnections.rows.length || !courseMembers.rows.length || !launchSnapshot.isAdmin || !launchSnapshot.integrations?.appwriteWeb) throw new Error("Phase 7 launch controls, entitlements, collaboration, and administration were not persisted.");
+  if (!courseInvites.rows.length || !cohortMemberships.rows.length || !securityEvents.rows.length) throw new Error("Phase 8 invitation, cohort, and audit records were not persisted.");
   console.log(JSON.stringify({
     function: functionId,
     materialStatus: "ready",
@@ -355,19 +378,30 @@ try {
     aiDailyEntitlement: entitlements.rows[0].aiDailyLimit,
     collaborationSeats: entitlements.rows[0].collaborationSeats,
     providerReadyCount: Object.values(launchSnapshot.integrations).filter(Boolean).length,
+    sharedCourse: sharedCourse.title,
+    acceptedRole: accepted.role,
+    cohort: cohortJoin.cohortName,
+    launchChecks: launchReview.checks.length,
+    securityEvents: securityEvents.rows.length,
   }, null, 2));
 } finally {
   if (created.courseId) {
     await adminTables.deleteRow({ databaseId, tableId: "launch_admins", rowId: "primary" }).catch(() => undefined);
-    for (const tableId of ["course_members", "calendar_connections", "launch_preferences", "entitlements", "product_feedback", "analytics_events", "beta_profiles", "knowledge_chunks", "notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
-      const ownerScoped = ["course_members", "calendar_connections", "launch_preferences", "entitlements", "product_feedback", "analytics_events", "beta_profiles", "notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
+    for (const tableId of ["course_invites", "course_members", "calendar_connections", "launch_preferences", "entitlements", "product_feedback", "analytics_events", "beta_profiles", "knowledge_chunks", "notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
+      const ownerScoped = ["course_invites", "course_members", "calendar_connections", "launch_preferences", "entitlements", "product_feedback", "analytics_events", "beta_profiles", "notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
       const actualField = ownerScoped ? "ownerId" : "courseId";
       const value = ownerScoped ? created.userId : created.courseId;
       await deleteMatching(tableId, [Query.equal(actualField, [value])]).catch(() => undefined);
+    }
+    await deleteMatching("security_events", [Query.equal("actorId", [created.userId, created.memberUserId])]).catch(() => undefined);
+    if (created.cohortId) {
+      await deleteMatching("cohort_memberships", [Query.equal("cohortId", [created.cohortId])]).catch(() => undefined);
+      await adminTables.deleteRow({ databaseId, tableId: "launch_cohorts", rowId: created.cohortId }).catch(() => undefined);
     }
     await adminTables.deleteRow({ databaseId, tableId: "courses", rowId: created.courseId }).catch(() => undefined);
   }
   if (created.fileId) await adminStorage.deleteFile({ bucketId, fileId: created.fileId }).catch(() => undefined);
   if (created.submissionFileId) await adminStorage.deleteFile({ bucketId: submissionsBucketId, fileId: created.submissionFileId }).catch(() => undefined);
   await users.delete({ userId: created.userId }).catch(() => undefined);
+  await users.delete({ userId: created.memberUserId }).catch(() => undefined);
 }

@@ -4,7 +4,7 @@ Cognora AI is a personal learning operating system that connects planning, lectu
 
 ## Current product state
 
-Phase 7 provides:
+Phase 8 provides:
 
 - Appwrite email/password authentication
 - private student profiles and onboarding preferences
@@ -37,6 +37,10 @@ Phase 7 provides:
 - course membership roles and collaboration-seat foundations
 - optional OpenAI-compatible embeddings with full-text fallback and cosine reranking
 - registered Appwrite web origins for local and private production access
+- expiring, bounded-use course invitation codes with server-side verification
+- shared course intelligence with personal evidence and submissions kept private
+- capacity-limited founding cohorts and content-free security audit events
+- audited private-pilot/public-launch gates plus a concurrent launch load check
 
 Email, calendar OAuth, vector embeddings, billing, and custom-domain activation are provider-ready but remain disabled until their external credentials and DNS are connected.
 
@@ -55,7 +59,8 @@ Email, calendar OAuth, vector embeddings, billing, and custom-domain activation 
 3. Provision the Appwrite resources with `npm run appwrite:provision`.
 4. Deploy the learning function with `npm run appwrite:deploy-function`.
 5. Optionally validate the full temporary learning, intelligence, retrieval, beta, launch-administration, operations, and reminder loop with `npm run appwrite:smoke-learning`.
-6. Start the app with `npm run dev`.
+6. Optionally run the concurrent launch snapshot check with `npm run appwrite:load-launch`.
+7. Start the app with `npm run dev`.
 
 ## Validation
 

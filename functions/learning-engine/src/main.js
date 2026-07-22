@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { Client, ID, Messaging, Permission, Query, Role, Storage, TablesDB, Users } from "node-appwrite";
 import { OfficeParser } from "officeparser";
 
@@ -96,7 +97,7 @@ function createUserServices(req) {
     databaseId: process.env.APPWRITE_DATABASE_ID,
     bucketId: process.env.APPWRITE_MATERIALS_BUCKET_ID,
     submissionsBucketId: process.env.APPWRITE_SUBMISSIONS_BUCKET_ID || "submissions",
-    admin: adminClient ? { tables: new TablesDB(adminClient), users: new Users(adminClient), messaging: new Messaging(adminClient) } : null,
+    admin: adminClient ? { tables: new TablesDB(adminClient), users: new Users(adminClient), messaging: new Messaging(adminClient), storage: new Storage(adminClient) } : null,
   };
 }
 
@@ -881,13 +882,16 @@ async function getLaunchSnapshot(services) {
   const isAdmin = admins.rows.some((row) => row.userId === userId);
   const snapshot = { ok: true, isAdmin, canClaimAdmin: admins.rows.length === 0, integrations: integrationReadiness(), personal };
   if (!isAdmin) return snapshot;
-  const [accounts, feedback, platformJobs, failedJobs] = await Promise.all([
+  const [accounts, feedback, platformJobs, failedJobs, invites, cohortMembers, securityWarnings] = await Promise.all([
     admin.users.list({ queries: [Query.limit(1)] }),
     admin.tables.listRows({ databaseId, tableId: "product_feedback", queries: [Query.limit(1)] }),
     admin.tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
     admin.tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.equal("status", ["failed"]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
+    admin.tables.listRows({ databaseId, tableId: "course_invites", queries: [Query.equal("status", ["active"]), Query.limit(1)] }),
+    admin.tables.listRows({ databaseId, tableId: "cohort_memberships", queries: [Query.equal("status", ["active"]), Query.limit(1)] }),
+    admin.tables.listRows({ databaseId, tableId: "security_events", queries: [Query.equal("severity", ["warning", "critical"]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
   ]);
-  return { ...snapshot, platform: { accounts: accounts.total, feedback: feedback.total, aiJobsToday: platformJobs.total, failedJobsToday: failedJobs.total } };
+  return { ...snapshot, platform: { accounts: accounts.total, feedback: feedback.total, aiJobsToday: platformJobs.total, failedJobsToday: failedJobs.total, activeInvites: invites.total, cohortMembers: cohortMembers.total, securityWarningsToday: securityWarnings.total } };
 }
 
 async function claimLaunchAdmin(services) {
@@ -903,6 +907,218 @@ async function claimLaunchAdmin(services) {
     }).catch((caught) => { if (caught?.code !== 409) throw caught; });
   }
   return getLaunchSnapshot(services);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function splitAccessCode(value, label) {
+  const [resourceId, secret, extra] = text(value).split(".");
+  if (!resourceId || !secret || extra || resourceId.length > 36 || secret.length < 20) throw new Error(`${label} is invalid.`);
+  return { resourceId, secret };
+}
+
+function memberPermissions(ownerId, memberId) {
+  return [
+    Permission.read(Role.user(ownerId)),
+    Permission.update(Role.user(ownerId)),
+    Permission.delete(Role.user(ownerId)),
+    Permission.read(Role.user(memberId)),
+  ];
+}
+
+function collaborativePermissions(ownerId, memberships) {
+  const permissions = [
+    Permission.read(Role.user(ownerId)),
+    Permission.update(Role.user(ownerId)),
+    Permission.delete(Role.user(ownerId)),
+  ];
+  for (const membership of memberships) {
+    if (membership.memberId === ownerId || membership.status !== "active") continue;
+    permissions.push(Permission.read(Role.user(membership.memberId)));
+    if (membership.role === "editor") permissions.push(Permission.update(Role.user(membership.memberId)));
+  }
+  return [...new Set(permissions)];
+}
+
+async function auditSecurityEvent(services, { eventName, targetType, targetId, metadata = {}, severity = "info" }) {
+  if (!services.admin) return;
+  await services.admin.tables.createRow({
+    databaseId: services.databaseId,
+    tableId: "security_events",
+    rowId: ID.unique(),
+    data: {
+      actorId: services.userId,
+      eventName: text(eventName).slice(0, 80),
+      targetType: text(targetType).slice(0, 64),
+      targetId: text(targetId).slice(0, 36) || undefined,
+      metadataJson: JSON.stringify(metadata).slice(0, 20_000),
+      severity,
+      createdAt: new Date().toISOString(),
+    },
+    permissions: [Permission.read(Role.user(services.userId))],
+  });
+}
+
+async function requireLaunchAdmin(services) {
+  if (!services.admin) throw new Error("Launch administration is unavailable until the function key is configured.");
+  const admins = await services.admin.tables.listRows({
+    databaseId: services.databaseId,
+    tableId: "launch_admins",
+    queries: [Query.equal("userId", [services.userId]), Query.limit(1)],
+  });
+  if (!admins.rows.length) throw new Error("Only a launch owner or operator can perform this action.");
+  return admins.rows[0];
+}
+
+const SHARED_COURSE_TABLES = [
+  "materials",
+  "material_insights",
+  "concepts",
+  "study_tasks",
+  "practice_items",
+  "gap_insights",
+  "roadmaps",
+  "roadmap_steps",
+  "knowledge_chunks",
+  "assignments",
+];
+
+async function refreshCourseAccess(services, course) {
+  const { admin, databaseId, bucketId } = services;
+  if (!admin) throw new Error("Collaboration is unavailable until the function key is configured.");
+  const membershipRows = await admin.tables.listRows({
+    databaseId,
+    tableId: "course_members",
+    queries: [Query.equal("courseId", [course.$id]), Query.equal("status", ["active"]), Query.limit(100)],
+  });
+  const permissions = collaborativePermissions(course.ownerId, membershipRows.rows);
+  await admin.tables.updateRow({ databaseId, tableId: "courses", rowId: course.$id, data: {}, permissions });
+  for (const tableId of SHARED_COURSE_TABLES) {
+    const rows = await admin.tables.listRows({ databaseId, tableId, queries: [Query.equal("courseId", [course.$id]), Query.limit(500)], total: false });
+    for (const row of rows.rows) {
+      await admin.tables.updateRow({ databaseId, tableId, rowId: row.$id, data: {}, permissions });
+      if (tableId === "materials" && row.fileId) {
+        await admin.storage.updateFile({ bucketId, fileId: row.fileId, permissions }).catch(() => undefined);
+      }
+    }
+  }
+  return { memberships: membershipRows.rows.length, sharedTables: SHARED_COURSE_TABLES.length };
+}
+
+async function createCourseInvite(services, body) {
+  if (!services.admin) throw new Error("Collaboration is unavailable until the function key is configured.");
+  const courseId = text(body.courseId);
+  const role = body.role === "editor" ? "editor" : "viewer";
+  const course = await services.tables.getRow({ databaseId: services.databaseId, tableId: "courses", rowId: courseId });
+  if (course.ownerId !== services.userId) throw new Error("Only the course owner can create an invitation.");
+  const [entitlements, activeInvites] = await Promise.all([
+    services.tables.listRows({ databaseId: services.databaseId, tableId: "entitlements", queries: [Query.equal("ownerId", [services.userId]), Query.limit(1)] }),
+    services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "course_invites", queries: [Query.equal("ownerId", [services.userId]), Query.equal("status", ["active"]), Query.limit(100)] }),
+  ]);
+  if (activeInvites.rows.length >= 20) throw new Error("Revoke or use an active invitation before creating another.");
+  const seatLimit = clamp(entitlements.rows[0]?.collaborationSeats || 3, 1, 100);
+  const maxUses = clamp(body.maxUses || 1, 1, seatLimit);
+  const expiresInDays = clamp(body.expiresInDays || 7, 1, 30);
+  const inviteId = ID.unique();
+  const secret = randomBytes(24).toString("base64url");
+  const expiresAt = new Date(Date.now() + expiresInDays * 86_400_000).toISOString();
+  await services.admin.tables.createRow({
+    databaseId: services.databaseId,
+    tableId: "course_invites",
+    rowId: inviteId,
+    data: { ownerId: services.userId, courseId, codeHash: sha256(`${inviteId}.${secret}`), role, maxUses, useCount: 0, status: "active", expiresAt, createdAt: new Date().toISOString() },
+    permissions: userPermissions(services.userId),
+  });
+  await auditSecurityEvent(services, { eventName: "course_invite_created", targetType: "course", targetId: courseId, metadata: { role, maxUses, expiresAt } });
+  return { ok: true, inviteCode: `${inviteId}.${secret}`, role, maxUses, expiresAt, courseTitle: course.title };
+}
+
+async function acceptCourseInvite(services, body) {
+  if (!services.admin) throw new Error("Collaboration is unavailable until the function key is configured.");
+  const { resourceId: inviteId, secret } = splitAccessCode(body.inviteCode, "Invitation code");
+  const invite = await services.admin.tables.getRow({ databaseId: services.databaseId, tableId: "course_invites", rowId: inviteId }).catch(() => null);
+  if (!invite || invite.codeHash !== sha256(`${inviteId}.${secret}`)) {
+    await auditSecurityEvent(services, { eventName: "course_invite_rejected", targetType: "course_invite", targetId: inviteId, severity: "warning" });
+    throw new Error("Invitation code is invalid.");
+  }
+  if (invite.ownerId === services.userId) throw new Error("You already own this course.");
+  if (invite.status !== "active" || new Date(invite.expiresAt).getTime() <= Date.now() || invite.useCount >= invite.maxUses) throw new Error("This invitation has expired or has no remaining seats.");
+  const course = await services.admin.tables.getRow({ databaseId: services.databaseId, tableId: "courses", rowId: invite.courseId });
+  const existing = await services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "course_members", queries: [Query.equal("courseId", [invite.courseId]), Query.equal("memberId", [services.userId]), Query.limit(1)] });
+  if (existing.rows[0]) {
+    await services.admin.tables.updateRow({ databaseId: services.databaseId, tableId: "course_members", rowId: existing.rows[0].$id, data: { role: invite.role, status: "active", joinedAt: new Date().toISOString() }, permissions: memberPermissions(invite.ownerId, services.userId) });
+  } else {
+    await services.admin.tables.createRow({ databaseId: services.databaseId, tableId: "course_members", rowId: ID.unique(), data: { ownerId: invite.ownerId, courseId: invite.courseId, memberId: services.userId, role: invite.role, status: "active", joinedAt: new Date().toISOString() }, permissions: memberPermissions(invite.ownerId, services.userId) });
+  }
+  const useCount = invite.useCount + 1;
+  await services.admin.tables.updateRow({ databaseId: services.databaseId, tableId: "course_invites", rowId: inviteId, data: { useCount, status: useCount >= invite.maxUses ? "exhausted" : "active" } });
+  const access = await refreshCourseAccess(services, course);
+  await auditSecurityEvent(services, { eventName: "course_invite_accepted", targetType: "course", targetId: course.$id, metadata: { role: invite.role } });
+  return { ok: true, courseId: course.$id, courseTitle: course.title, role: invite.role, access };
+}
+
+async function createLaunchCohort(services, body) {
+  await requireLaunchAdmin(services);
+  const name = text(body.name);
+  if (name.length < 3) throw new Error("Give the cohort a clear name.");
+  const cohortId = ID.unique();
+  const secret = randomBytes(24).toString("base64url");
+  const maxMembers = clamp(body.maxMembers || 25, 1, 500);
+  await services.admin.tables.createRow({
+    databaseId: services.databaseId,
+    tableId: "launch_cohorts",
+    rowId: cohortId,
+    data: { createdBy: services.userId, name: name.slice(0, 120), codeHash: sha256(`${cohortId}.${secret}`), status: "open", maxMembers, memberCount: 0, createdAt: new Date().toISOString() },
+    permissions: userPermissions(services.userId),
+  });
+  await auditSecurityEvent(services, { eventName: "launch_cohort_created", targetType: "launch_cohort", targetId: cohortId, metadata: { maxMembers } });
+  return { ok: true, cohortId, cohortName: name.slice(0, 120), cohortCode: `${cohortId}.${secret}`, maxMembers };
+}
+
+async function joinLaunchCohort(services, body) {
+  if (!services.admin) throw new Error("Cohort enrollment is unavailable until the function key is configured.");
+  const { resourceId: cohortId, secret } = splitAccessCode(body.cohortCode, "Cohort code");
+  const cohort = await services.admin.tables.getRow({ databaseId: services.databaseId, tableId: "launch_cohorts", rowId: cohortId }).catch(() => null);
+  if (!cohort || cohort.codeHash !== sha256(`${cohortId}.${secret}`) || cohort.status !== "open") {
+    await auditSecurityEvent(services, { eventName: "cohort_join_rejected", targetType: "launch_cohort", targetId: cohortId, severity: "warning" });
+    throw new Error("Cohort code is invalid or enrollment is closed.");
+  }
+  const existing = await services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "cohort_memberships", queries: [Query.equal("cohortId", [cohortId]), Query.equal("userId", [services.userId]), Query.limit(1)] });
+  if (!existing.rows.length && cohort.memberCount >= cohort.maxMembers) throw new Error("This cohort has reached its member limit.");
+  if (existing.rows[0]) {
+    await services.admin.tables.updateRow({ databaseId: services.databaseId, tableId: "cohort_memberships", rowId: existing.rows[0].$id, data: { status: "active", joinedAt: new Date().toISOString() }, permissions: [Permission.read(Role.user(services.userId))] });
+  } else {
+    await services.admin.tables.createRow({ databaseId: services.databaseId, tableId: "cohort_memberships", rowId: ID.unique(), data: { cohortId, userId: services.userId, status: "active", joinedAt: new Date().toISOString() }, permissions: [Permission.read(Role.user(services.userId))] });
+    await services.admin.tables.updateRow({ databaseId: services.databaseId, tableId: "launch_cohorts", rowId: cohortId, data: { memberCount: cohort.memberCount + 1 } });
+  }
+  await auditSecurityEvent(services, { eventName: "launch_cohort_joined", targetType: "launch_cohort", targetId: cohortId });
+  return { ok: true, cohortId, cohortName: cohort.name };
+}
+
+async function runLaunchReview(services) {
+  await requireLaunchAdmin(services);
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const [admins, failedJobs, warnings, cohorts] = await Promise.all([
+    services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "launch_admins", queries: [Query.limit(1)] }),
+    services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "ai_jobs", queries: [Query.equal("status", ["failed"]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
+    services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "security_events", queries: [Query.equal("severity", ["critical"]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
+    services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "launch_cohorts", queries: [Query.equal("status", ["open"]), Query.limit(1)] }),
+  ]);
+  const integrations = integrationReadiness();
+  const checks = [
+    { key: "admin", label: "Launch owner assigned", passed: admins.total > 0 },
+    { key: "web", label: "Production Appwrite origin registered", passed: integrations.appwriteWeb },
+    { key: "failures", label: "No failed AI jobs today", passed: failedJobs.total === 0 },
+    { key: "security", label: "No critical security events today", passed: warnings.total === 0 },
+    { key: "cohort", label: "Controlled cohort is staged", passed: cohorts.total > 0 },
+  ];
+  const privatePilotReady = checks.every((check) => check.passed);
+  const publicLaunchReady = privatePilotReady && Object.values(integrations).every(Boolean);
+  await auditSecurityEvent(services, { eventName: "launch_review_completed", targetType: "deployment", metadata: { privatePilotReady, publicLaunchReady, failedChecks: checks.filter((check) => !check.passed).map((check) => check.key) }, severity: privatePilotReady ? "info" : "warning" });
+  return { ok: true, privatePilotReady, publicLaunchReady, checks, integrations, reviewedAt: new Date().toISOString() };
 }
 
 async function prepareJob(services, body) {
@@ -1016,6 +1232,11 @@ async function main({ req, res, log, error }) {
     else if (body.action === "sync_reminders") result = await syncReminders(services);
     else if (body.action === "get_launch_snapshot") result = await getLaunchSnapshot(services);
     else if (body.action === "claim_launch_admin") result = await claimLaunchAdmin(services);
+    else if (body.action === "create_course_invite") result = await createCourseInvite(services, body);
+    else if (body.action === "accept_course_invite") result = await acceptCourseInvite(services, body);
+    else if (body.action === "create_launch_cohort") result = await createLaunchCohort(services, body);
+    else if (body.action === "join_launch_cohort") result = await joinLaunchCohort(services, body);
+    else if (body.action === "run_launch_review") result = await runLaunchReview(services);
     else throw new Error("Unknown learning engine action.");
     if (body.action === "generate_plan") await syncReminders(services).catch(() => undefined);
     await completeJob(services);

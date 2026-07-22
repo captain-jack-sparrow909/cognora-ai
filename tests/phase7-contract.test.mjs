@@ -38,5 +38,5 @@ test("keeps the Phase 7 launch and scale contract wired end to end", async () =>
   assert.match(deploy, /UsersRead/);
   assert.match(environment, /EMBEDDING_API_KEY/);
   assert.match(environment, /APPWRITE_EMAIL_READY=false/);
-  assert.match(page, /Phase 7 · Launch controlled/);
+  assert.match(page, /Phase 8 · Launch gated/);
 });

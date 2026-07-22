@@ -16,11 +16,13 @@ import {
   ShieldCheck,
   Sparkles,
   UploadCloud,
+  UsersRound,
   X,
 } from "lucide-react";
 import { ID, Permission, Query, Role } from "appwrite";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getAppwriteBrowserServices } from "@/lib/appwrite/client";
+import { listAccessibleCourses } from "@/lib/appwrite/courses";
 import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
 import type { Course, CourseColor, CourseMaterial, MaterialKind } from "@/lib/appwrite/models";
 import { privateUserPermissions } from "@/lib/appwrite/permissions";
@@ -68,14 +70,7 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
 
   const loadCourses = useCallback(async () => {
     try {
-      const { tables, config } = getAppwriteBrowserServices();
-      const result = await tables.listRows<Course>({
-        databaseId: config.databaseId,
-        tableId: "courses",
-        queries: [Query.equal("ownerId", [userId]), Query.equal("status", ["active"]), Query.orderDesc("createdAt")],
-        ttl: 0,
-      });
-      setCourses(result.rows);
+      setCourses(await listAccessibleCourses(userId));
     } catch (caught) {
       setError(getAppwriteErrorMessage(caught));
     } finally {
@@ -89,14 +84,14 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
       const result = await tables.listRows<CourseMaterial>({
         databaseId: config.databaseId,
         tableId: "materials",
-        queries: [Query.equal("ownerId", [userId]), Query.equal("courseId", [courseId]), Query.orderDesc("createdAt")],
+        queries: [Query.equal("courseId", [courseId]), Query.orderDesc("createdAt")],
         ttl: 0,
       });
       setMaterials(result.rows);
     } catch (caught) {
       setError(getAppwriteErrorMessage(caught));
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     queueMicrotask(() => void loadCourses());
@@ -212,6 +207,7 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
   }
 
   if (selectedCourse) {
+    const sharedReadOnly = selectedCourse.ownerId !== userId;
     return (
       <div className="page-wrap courses-page course-detail-page">
         <button className="back-button" type="button" onClick={() => { setSelectedCourse(null); setMaterials([]); }}>
@@ -233,6 +229,7 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
           course={selectedCourse}
           materials={materials}
           onMaterialsChanged={() => loadMaterials(selectedCourse.$id)}
+          readOnly={sharedReadOnly}
         />
 
         <section className="course-detail-grid">
@@ -242,7 +239,7 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
                 <p className="card-kicker">Unified course library</p>
                 <h2>Course materials</h2>
               </div>
-              <label className={`upload-button ${uploading ? "disabled" : ""}`}>
+              {!sharedReadOnly && <label className={`upload-button ${uploading ? "disabled" : ""}`}>
                 {uploading ? <LoaderCircle className="spin" size={16} /> : <UploadCloud size={16} />}
                 {uploading ? `Uploading ${uploadProgress}%` : "Upload material"}
                 <input
@@ -255,11 +252,11 @@ export function CoursesWorkspace({ userId }: { userId: string }) {
                     if (file) void uploadMaterial(file);
                   }}
                 />
-              </label>
+              </label>}
             </div>
 
             {materials.length === 0 ? (
-              <button className="material-dropzone" type="button" onClick={() => fileInputRef.current?.click()}>
+              sharedReadOnly ? <div className="material-dropzone"><span><UsersRound size={25} /></span><strong>Shared course library</strong><p>The owner has not added material yet.</p><small>Your personal mastery and submissions remain separate.</small></div> : <button className="material-dropzone" type="button" onClick={() => fileInputRef.current?.click()}>
                 <span><UploadCloud size={25} /></span>
                 <strong>Add your first course material</strong>
                 <p>Upload a syllabus, lecture PDF, slides, notes, or transcript.</p>

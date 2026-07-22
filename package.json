@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "appwrite:provision": "node --env-file=.env scripts/appwrite/provision.mjs",
     "appwrite:deploy-function": "node --env-file=.env scripts/appwrite/deploy-learning-engine.mjs",
-    "appwrite:smoke-learning": "node --env-file=.env scripts/appwrite/smoke-learning-engine.mjs"
+    "appwrite:smoke-learning": "node --env-file=.env scripts/appwrite/smoke-learning-engine.mjs",
+    "appwrite:load-launch": "node --env-file=.env scripts/appwrite/load-launch.mjs"
   },
   "dependencies": {
     "appwrite": "^26.2.0",

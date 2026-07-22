@@ -577,6 +577,7 @@ const definitions = [
       { key: "course_member", type: TablesDBIndexType.Unique, columns: ["courseId", "memberId"] },
       { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
       { key: "member_status", type: TablesDBIndexType.Key, columns: ["memberId", "status"] },
+      { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "status"] },
     ],
   },
   {
@@ -589,6 +590,80 @@ const definitions = [
       { key: "claimedAt", type: "datetime", required: true },
     ],
     indexes: [{ key: "user_unique", type: TablesDBIndexType.Unique, columns: ["userId"] }],
+  },
+  {
+    id: "course_invites",
+    name: "Private course invitation codes",
+    createPermissions: [],
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "codeHash", type: "varchar", size: 64, required: true },
+      { key: "role", type: "enum", elements: ["editor", "viewer"], required: true },
+      { key: "maxUses", type: "integer", min: 1, max: 100, required: true },
+      { key: "useCount", type: "integer", min: 0, max: 100, required: true },
+      { key: "status", type: "enum", elements: ["active", "exhausted", "revoked"], required: true },
+      { key: "expiresAt", type: "datetime", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_status", type: TablesDBIndexType.Key, columns: ["ownerId", "status"] },
+      { key: "course_status", type: TablesDBIndexType.Key, columns: ["courseId", "status"] },
+      { key: "status_only", type: TablesDBIndexType.Key, columns: ["status"] },
+    ],
+  },
+  {
+    id: "launch_cohorts",
+    name: "Controlled launch cohorts",
+    createPermissions: [],
+    columns: [
+      { key: "createdBy", type: "varchar", size: 36, required: true },
+      { key: "name", type: "varchar", size: 120, required: true },
+      { key: "codeHash", type: "varchar", size: 64, required: true },
+      { key: "status", type: "enum", elements: ["draft", "open", "closed"], required: true },
+      { key: "maxMembers", type: "integer", min: 1, max: 10000, required: true },
+      { key: "memberCount", type: "integer", min: 0, max: 10000, required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "creator_status", type: TablesDBIndexType.Key, columns: ["createdBy", "status"] },
+      { key: "status_created", type: TablesDBIndexType.Key, columns: ["status", "createdAt"] },
+    ],
+  },
+  {
+    id: "cohort_memberships",
+    name: "Launch cohort memberships",
+    createPermissions: [],
+    columns: [
+      { key: "cohortId", type: "varchar", size: 36, required: true },
+      { key: "userId", type: "varchar", size: 36, required: true },
+      { key: "status", type: "enum", elements: ["active", "removed"], required: true },
+      { key: "joinedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "cohort_user", type: TablesDBIndexType.Unique, columns: ["cohortId", "userId"] },
+      { key: "user_status", type: TablesDBIndexType.Key, columns: ["userId", "status"] },
+      { key: "status_only", type: TablesDBIndexType.Key, columns: ["status"] },
+    ],
+  },
+  {
+    id: "security_events",
+    name: "Launch security audit events",
+    createPermissions: [],
+    columns: [
+      { key: "actorId", type: "varchar", size: 36, required: true },
+      { key: "eventName", type: "varchar", size: 80, required: true },
+      { key: "targetType", type: "varchar", size: 64, required: true },
+      { key: "targetId", type: "varchar", size: 36, required: false },
+      { key: "metadataJson", type: "text", required: true },
+      { key: "severity", type: "enum", elements: ["info", "warning", "critical"], required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "actor_created", type: TablesDBIndexType.Key, columns: ["actorId", "createdAt"] },
+      { key: "severity_created", type: TablesDBIndexType.Key, columns: ["severity", "createdAt"] },
+      { key: "target_created", type: TablesDBIndexType.Key, columns: ["targetId", "createdAt"] },
+    ],
   },
 ];
 
@@ -801,4 +876,4 @@ for (const [index, hostname] of webHosts.entries()) {
   console.log(`Registered web platform: ${hostname}`);
 }
 
-console.log("Appwrite Phase 7 resources are ready.");
+console.log("Appwrite Phase 8 resources are ready.");
