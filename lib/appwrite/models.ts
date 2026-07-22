@@ -307,7 +307,7 @@ export type LaunchPreferences = Models.Row & {
 
 export type CalendarConnection = Models.Row & {
   ownerId: string;
-  provider: "google" | "microsoft";
+  provider: "google";
   status: "not-configured" | "connected" | "paused" | "error";
   syncMode: "export" | "import" | "two-way";
   conflictPolicy: "ask" | "cognora-wins" | "calendar-wins";
@@ -358,7 +358,7 @@ export type LaunchReview = {
 };
 
 export type ProviderActivation = {
-  provider: "email" | "google-calendar" | "microsoft-calendar" | "embeddings" | "stripe" | "custom-domain";
+  provider: "email" | "google-calendar" | "embeddings" | "stripe" | "custom-domain";
   status: "unconfigured" | "configured" | "verifying" | "verified" | "error";
   configuration: { configured?: boolean; detail?: string; dimensions?: number; accountCountry?: string; chargesEnabled?: boolean };
   verifiedAt?: string;
@@ -404,7 +404,6 @@ export type LaunchSnapshot = {
     appwriteWeb: boolean;
     email: boolean;
     googleCalendar: boolean;
-    microsoftCalendar: boolean;
     embeddings: boolean;
     billing: boolean;
     customDomain: boolean;

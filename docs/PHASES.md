@@ -65,7 +65,7 @@ Delivered with an installable PWA shell, safe static-asset caching, `.ics` expor
 - Usage entitlements, collaboration roles, and staged release controls
 - Registered Appwrite web platforms for local and private production access
 
-Delivered with account-level AI, storage, and collaboration limits; live usage meters; staged release channels; course membership roles; calendar sync-state and conflict-policy records; optional OpenAI-compatible embeddings with full-text fallback; provider-ready email delivery; and an owner-claimable administration dashboard that exposes aggregate counts without learner content. Appwrite production and localhost origins are registered. External provider switches remain off because email, Google, Microsoft, Stripe, embedding, custom-domain credentials, and DNS are not configured.
+Delivered with account-level AI, storage, and collaboration limits; live usage meters; staged release channels; course membership roles; Google Calendar sync-state and conflict-policy records; optional OpenAI-compatible embeddings with full-text fallback; provider-ready email delivery; and an owner-claimable administration dashboard that exposes aggregate counts without learner content. Appwrite production and localhost origins are registered. External provider switches remain off until email, Google, Stripe, and embedding configuration is verified.
 
 ## Phase 8 — Launch gate and controlled collaboration ✅
 
@@ -76,24 +76,24 @@ Delivered with account-level AI, storage, and collaboration limits; live usage m
 - Private-pilot and public-launch readiness checks with external providers treated as hard gates
 - A repeatable concurrent Appwrite Function load check for the launch dashboard
 
-Delivered without weakening the private deployment. Invitation and cohort secrets are returned once, stored only as SHA-256 hashes, and verified inside the Appwrite Function. Course permissions are refreshed server-side when a learner joins. The launch review distinguishes a safe private pilot from a public launch and cannot enable public access. Email, Google, Microsoft, Stripe, embeddings, and custom-domain readiness remain off until their real credentials and DNS are supplied.
+Delivered without weakening the private deployment. Invitation and cohort secrets are returned once, stored only as SHA-256 hashes, and verified inside the Appwrite Function. Course permissions are refreshed server-side when a learner joins. The launch review distinguishes a safe private pilot from a public launch and cannot enable public access. Email, Google, Stripe, and embeddings remain gated until their real configuration is supplied and verified.
 
 ## Phase 9 — Production activation gate ⚠️ External inputs required
 
-- Live, server-side verification for Appwrite email, Google/Microsoft calendar credentials, embeddings, Stripe, and the custom hostname
+- Live, server-side verification for Appwrite email, Google Calendar credentials, embeddings, Stripe, and the Appwrite-hosted production site
 - Persisted provider activation evidence with configured, verified, and error states
 - Bounded embedding backfill for existing private source passages
 - Stripe Checkout plus a separately deployable, signature-verified webhook that updates subscriptions and entitlements idempotently
 - Persisted final launch approvals that combine private-pilot checks with every verified external provider
 - A production activation center that keeps unavailable actions disabled and lists exact blockers
 
-The activation layer is delivered and privately deployed. The provider audit accurately found no Appwrite email provider, calendar OAuth credentials, embedding endpoint, Stripe credentials/prices, or custom domain. Therefore the final approval remains blocked and Sites access remains owner-only. No readiness flag is promoted merely because UI or schema support exists.
+The activation layer verifies each configured external provider and the production Appwrite Site. No readiness flag is promoted merely because UI or schema support exists.
 
 ## Phase 10 — Provider hookup and first public cohort
 
 - Add and verify the chosen email provider and sender
-- Register calendar OAuth apps, redirect URIs, consent scopes, and two-way sync tests
+- Register Google Calendar OAuth, redirect URIs, consent scopes, and two-way sync tests
 - Connect the embedding endpoint and complete the source-vector backfill
 - Add Stripe secrets and prices, deploy the billing webhook, and complete a test subscription lifecycle
-- Attach the chosen custom hostname and complete DNS/SSL validation
+- Verify the Appwrite-provided Sites hostname and live application manifest
 - Re-run the final approval, explicitly approve the Sites access change, and open the first production cohort

@@ -14,10 +14,9 @@ const integrationLabels: Array<{ key: keyof LaunchSnapshot["integrations"]; labe
   { key: "appwriteWeb", label: "Web origins", detail: "Production and local Appwrite origins", icon: Globe2 },
   { key: "email", label: "Email delivery", detail: "Appwrite provider and verified sender", icon: Mail },
   { key: "googleCalendar", label: "Google Calendar", detail: "Two-way OAuth synchronization", icon: CalendarSync },
-  { key: "microsoftCalendar", label: "Microsoft Calendar", detail: "Outlook two-way OAuth synchronization", icon: CalendarSync },
   { key: "embeddings", label: "Vector retrieval", detail: "Embedding provider for hybrid search", icon: DatabaseZap },
   { key: "billing", label: "Billing", detail: "Stripe plans and lifecycle events", icon: CreditCard },
-  { key: "customDomain", label: "Custom domain", detail: "Production hostname and DNS validation", icon: Globe2 },
+  { key: "customDomain", label: "Production site", detail: "Appwrite Sites hostname and live manifest", icon: Globe2 },
 ];
 
 function percent(value: number, limit: number) {
@@ -83,7 +82,7 @@ export function LaunchScaleWorkspace({ userId }: { userId: string }) {
       const channelValue = String(values.get("releaseChannel")); const releaseChannel: LaunchPreferences["releaseChannel"] = ["private-beta", "early-access", "general"].includes(channelValue) ? channelValue as LaunchPreferences["releaseChannel"] : "private-beta";
       const policyValue = String(values.get("conflictPolicy")); const conflictPolicy: CalendarConnection["conflictPolicy"] = ["ask", "cognora-wins", "calendar-wins"].includes(policyValue) ? policyValue as CalendarConnection["conflictPolicy"] : "ask";
       const saved = await tables.upsertRow<LaunchPreferences>({ databaseId: config.databaseId, tableId: "launch_preferences", rowId: userId, data: { ownerId: userId, releaseChannel, autoUpdates: values.get("autoUpdates") === "on", providerAlerts: values.get("providerAlerts") === "on", updatedAt: now }, permissions });
-      const connectionRows = await Promise.all((["google", "microsoft"] as const).map((provider) => tables.upsertRow<CalendarConnection>({ databaseId: config.databaseId, tableId: "calendar_connections", rowId: `${userId}-${provider}`, data: { ownerId: userId, provider, status: "not-configured", syncMode: "two-way", conflictPolicy, updatedAt: now }, permissions })));
+      const connectionRows = await Promise.all((["google"] as const).map((provider) => tables.upsertRow<CalendarConnection>({ databaseId: config.databaseId, tableId: "calendar_connections", rowId: `${userId}-${provider}`, data: { ownerId: userId, provider, status: "not-configured", syncMode: "two-way", conflictPolicy, updatedAt: now }, permissions })));
       setPreferences(saved); setConnections(connectionRows); return true;
     }, () => "Launch channel and calendar conflict policy saved.");
   }

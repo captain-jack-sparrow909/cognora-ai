@@ -33,7 +33,7 @@ Phase 9 provides:
 - per-account AI, storage, and collaboration entitlements with live usage meters
 - staged private-beta, early-access, and general-release preferences
 - an owner-claimable, aggregate-only release-health dashboard
-- provider readiness for verified email, two-way calendars, embeddings, billing, and a custom domain
+- provider readiness for verified email, Google Calendar, embeddings, billing, and the production Appwrite Site
 - course membership roles and collaboration-seat foundations
 - optional OpenAI-compatible embeddings with full-text fallback and cosine reranking
 - registered Appwrite web origins for local and private production access
@@ -46,7 +46,7 @@ Phase 9 provides:
 - Stripe Checkout and a signature-verified, idempotent subscription webhook
 - immutable final launch approval evidence that cannot change Sites access
 
-Email, calendar OAuth, vector embeddings, billing, and custom-domain activation are provider-ready but remain disabled because their external credentials, provider records, and DNS are not yet connected.
+Email, Google Calendar OAuth, vector embeddings, and billing are provider-ready. The production URL can use the Appwrite-provided Sites hostname without separate DNS configuration.
 
 ## Stack
 

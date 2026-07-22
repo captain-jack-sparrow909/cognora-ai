@@ -6,7 +6,8 @@ import { InputFile } from "node-appwrite/file";
 const required = ["NEXT_PUBLIC_APPWRITE_ENDPOINT", "NEXT_PUBLIC_APPWRITE_PROJECT_ID", "APPWRITE_API_KEY", "APPWRITE_DATABASE_ID"];
 for (const key of required) if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
 
-if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET || !process.env.STRIPE_PRICE_PRO) {
+const stripeWebhookSecrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_WEBHOOK_SECRET_1, process.env.STRIPE_WEBHOOK_SECRET_2].filter(Boolean);
+if (!process.env.STRIPE_SECRET_KEY || !stripeWebhookSecrets.length || !process.env.STRIPE_PRICE_PRO) {
   console.log("Stripe credentials are not configured; billing-webhook deployment remains safely skipped.");
   process.exit(0);
 }
@@ -20,12 +21,14 @@ try { current = await functions.get({ functionId }); } catch (caught) { if (caug
 if (current) await functions.update(settings); else await functions.create(settings);
 
 const variables = [
-  ["database_id", "APPWRITE_DATABASE_ID", process.env.APPWRITE_DATABASE_ID, false],
-  ["stripe_secret", "STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY, true],
-  ["stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET, true],
-  ["stripe_price_pro", "STRIPE_PRICE_PRO", process.env.STRIPE_PRICE_PRO, false],
-];
-if (process.env.STRIPE_PRICE_EDUCATION) variables.push(["stripe_price_education", "STRIPE_PRICE_EDUCATION", process.env.STRIPE_PRICE_EDUCATION, false]);
+  ["billing_database_id", "APPWRITE_DATABASE_ID", process.env.APPWRITE_DATABASE_ID, false],
+  ["billing_stripe_secret", "STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY, true],
+  ["billing_stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET, true],
+  ["billing_stripe_webhook_secret_1", "STRIPE_WEBHOOK_SECRET_1", process.env.STRIPE_WEBHOOK_SECRET_1, true],
+  ["billing_stripe_webhook_secret_2", "STRIPE_WEBHOOK_SECRET_2", process.env.STRIPE_WEBHOOK_SECRET_2, true],
+  ["billing_stripe_price_pro", "STRIPE_PRICE_PRO", process.env.STRIPE_PRICE_PRO, false],
+].filter(([, , value]) => Boolean(value));
+if (process.env.STRIPE_PRICE_EDUCATION) variables.push(["billing_stripe_price_education", "STRIPE_PRICE_EDUCATION", process.env.STRIPE_PRICE_EDUCATION, false]);
 const existing = await functions.listVariables({ functionId, total: false });
 for (const [variableId, key, value, secret] of variables) {
   const match = existing.variables.find((variable) => variable.key === key);

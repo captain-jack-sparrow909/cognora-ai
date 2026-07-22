@@ -32,6 +32,8 @@ test("keeps the Phase 9 provider activation and billing contract wired end to en
   assert.match(billingDeploy, /Role\.any\(\)/);
   assert.match(environment, /STRIPE_WEBHOOK_SECRET/);
   assert.match(environment, /GOOGLE_CLIENT_SECRET/);
+  assert.doesNotMatch(environment, /MICROSOFT_CLIENT_SECRET/);
+  assert.doesNotMatch(models, /microsoft-calendar/);
   assert.match(models, /ProviderActivationSnapshot/);
   assert.match(activation, /External systems must prove they are ready/);
   assert.match(activation, /Opening access is a separate explicit action/);

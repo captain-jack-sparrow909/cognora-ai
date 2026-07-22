@@ -9,10 +9,9 @@ import type { LaunchApproval, ProviderActivation, ProviderActivationSnapshot } f
 const providerMeta: Record<ProviderActivation["provider"], { label: string; purpose: string; icon: typeof Mail }> = {
   email: { label: "Email delivery", purpose: "Verified reminders and collaboration invitations", icon: Mail },
   "google-calendar": { label: "Google Calendar", purpose: "OAuth-backed two-way schedule synchronization", icon: CalendarSync },
-  "microsoft-calendar": { label: "Microsoft Calendar", purpose: "OAuth-backed Outlook schedule synchronization", icon: CalendarSync },
   embeddings: { label: "Vector retrieval", purpose: "Semantic source search and controlled backfill", icon: DatabaseZap },
   stripe: { label: "Stripe billing", purpose: "Checkout, signed webhooks, and entitlement lifecycle", icon: CreditCard },
-  "custom-domain": { label: "Custom domain", purpose: "Validated DNS, SSL, and production hostname", icon: Globe2 },
+  "custom-domain": { label: "Production site", purpose: "Verified Appwrite Sites URL and live application manifest", icon: Globe2 },
 };
 
 function statusLabel(status: ProviderActivation["status"]) {
@@ -71,7 +70,7 @@ export function ProviderActivationWorkspace() {
     {error && <p className="workspace-error" role="alert">{error}</p>}{message && <p className="workspace-success" role="status">{message}</p>}
     <div className="activation-provider-grid">{snapshot.providers.map((provider) => { const meta = providerMeta[provider.provider]; return <article className={`activation-provider-card ${provider.status}`} key={provider.provider}><header><span><meta.icon size={17} /></span><em>{provider.status === "verified" ? <CheckCircle2 size={13} /> : <CircleDashed size={13} />}{statusLabel(provider.status)}</em></header><h3>{meta.label}</h3><p>{meta.purpose}</p><small>{provider.error || provider.configuration.detail || "Production configuration is not present."}</small>{provider.lastCheckedAt && <time>Checked {new Date(provider.lastCheckedAt).toLocaleString()}</time>}</article>; })}</div>
     <div className="activation-action-grid">
-      <article><span><RefreshCw size={19} /></span><div><strong>Verify production providers</strong><p>Checks Appwrite email, calendar credentials, the embedding endpoint, Stripe, and the custom hostname without exposing secrets.</p></div><button type="button" disabled={!snapshot.isAdmin || Boolean(busy)} onClick={() => void verify()}>{busy === "verify" ? <LoaderCircle className="spin" size={14} /> : <ShieldCheck size={14} />}Run verification</button></article>
+      <article><span><RefreshCw size={19} /></span><div><strong>Verify production providers</strong><p>Checks Appwrite email, Google Calendar credentials, the embedding endpoint, Stripe, and the hosted production site without exposing secrets.</p></div><button type="button" disabled={!snapshot.isAdmin || Boolean(busy)} onClick={() => void verify()}>{busy === "verify" ? <LoaderCircle className="spin" size={14} /> : <ShieldCheck size={14} />}Run verification</button></article>
       <article><span><DatabaseZap size={19} /></span><div><strong>Backfill vector retrieval</strong><p>Processes source passages in bounded batches only after the embedding provider passes verification.</p></div><button type="button" disabled={!snapshot.isAdmin || !embeddingsReady || Boolean(busy)} onClick={() => void backfill()}>{busy === "backfill" ? <LoaderCircle className="spin" size={14} /> : <DatabaseZap size={14} />}Backfill 25 passages</button></article>
       <article><span><CreditCard size={19} /></span><div><strong>Subscription lifecycle</strong><p>{snapshot.subscription ? `${snapshot.subscription.plan} · ${snapshot.subscription.status}` : "Stripe checkout and signed webhook updates remain unavailable until verified."}</p></div><button type="button" disabled={!billingReady || Boolean(busy)} onClick={() => void checkout()}>{busy === "checkout" ? <LoaderCircle className="spin" size={14} /> : <CreditCard size={14} />}Start Pro checkout</button></article>
     </div>

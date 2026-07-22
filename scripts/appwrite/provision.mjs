@@ -550,7 +550,7 @@ const definitions = [
     name: "Calendar sync connections",
     columns: [
       { key: "ownerId", type: "varchar", size: 36, required: true },
-      { key: "provider", type: "enum", elements: ["google", "microsoft"], required: true },
+      { key: "provider", type: "enum", elements: ["google"], required: true },
       { key: "status", type: "enum", elements: ["not-configured", "connected", "paused", "error"], required: true },
       { key: "syncMode", type: "enum", elements: ["export", "import", "two-way"], required: true },
       { key: "conflictPolicy", type: "enum", elements: ["ask", "cognora-wins", "calendar-wins"], required: true },
@@ -670,7 +670,7 @@ const definitions = [
     name: "Production provider verification state",
     createPermissions: [],
     columns: [
-      { key: "provider", type: "enum", elements: ["email", "google-calendar", "microsoft-calendar", "embeddings", "stripe", "custom-domain"], required: true },
+      { key: "provider", type: "enum", elements: ["email", "google-calendar", "embeddings", "stripe", "custom-domain"], required: true },
       { key: "status", type: "enum", elements: ["unconfigured", "configured", "verifying", "verified", "error"], required: true },
       { key: "configurationJson", type: "text", required: true },
       { key: "verifiedAt", type: "datetime", required: false },

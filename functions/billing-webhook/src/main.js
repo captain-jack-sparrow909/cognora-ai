@@ -24,6 +24,10 @@ function verifyStripeSignature(rawBody, signature, secret) {
   });
 }
 
+function stripeWebhookSecrets() {
+  return [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_WEBHOOK_SECRET_1, process.env.STRIPE_WEBHOOK_SECRET_2].filter(Boolean);
+}
+
 function subscriptionStatus(value) {
   if (value === "trialing") return "trialing";
   if (value === "active") return "active";
@@ -74,9 +78,10 @@ async function processSubscription(tables, databaseId, object, eventType) {
 export default async function main({ req, res, error }) {
   try {
     if (req.method !== "POST") return res.json({ ok: true, function: "billing-webhook" }, 200);
-    if (!process.env.STRIPE_WEBHOOK_SECRET) return res.json({ ok: false, error: "Billing webhook is not configured." }, 503);
+    const signingSecrets = stripeWebhookSecrets();
+    if (!signingSecrets.length) return res.json({ ok: false, error: "Billing webhook is not configured." }, 503);
     const rawBody = rawRequestBody(req);
-    if (!verifyStripeSignature(rawBody, header(req.headers, "stripe-signature"), process.env.STRIPE_WEBHOOK_SECRET)) return res.json({ ok: false, error: "Invalid webhook signature." }, 401);
+    if (!signingSecrets.some((secret) => verifyStripeSignature(rawBody, header(req.headers, "stripe-signature"), secret))) return res.json({ ok: false, error: "Invalid webhook signature." }, 401);
     const event = JSON.parse(rawBody);
     const endpoint = process.env.APPWRITE_ENDPOINT || process.env.APPWRITE_FUNCTION_API_ENDPOINT;
     const client = new Client().setEndpoint(endpoint).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(process.env.APPWRITE_FUNCTION_API_KEY);

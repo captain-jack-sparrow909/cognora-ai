@@ -130,8 +130,8 @@ Phase 8 exposes course titles, uploaded material, companion insights, concepts, 
 
 ### Launch provider boundary
 
-Appwrite web origins are live. Email, Google Calendar, Microsoft Calendar, embeddings, Stripe, and custom-domain switches default to false and are surfaced as setup-required. Enabling a switch requires the corresponding provider credentials or validated DNS; the interface never treats a stored preference as proof that an external integration is connected.
+Appwrite web origins and the Appwrite-provided Sites hostname are live. Email, Google Calendar, embeddings, and Stripe remain setup-required until their provider configuration is verified; the interface never treats a stored preference as proof that an external integration is connected.
 
 ### Production activation boundary
 
-Phase 9 separates “configured” from “verified.” Email verification inspects enabled Appwrite Messaging providers; embeddings perform a live vector probe; Stripe reads the authenticated account; calendars require credentials plus an explicit post-consent readiness flag; and the custom hostname requires both configured DNS/SSL state and a live manifest response. Final approval does not alter Sites access. Public access remains a distinct user-authorized hosting action.
+Phase 9 separates “configured” from “verified.” Email verification inspects enabled Appwrite Messaging providers; embeddings perform a live vector probe; Stripe reads the authenticated account; Google Calendar requires credentials plus an explicit post-consent readiness flag; and the Appwrite-hosted production URL must return the live manifest. Final approval does not alter Sites access. Public access remains a distinct user-authorized hosting action.

@@ -73,10 +73,8 @@ const variables = [
   ["web_ready", "APPWRITE_WEB_READY", process.env.APPWRITE_WEB_READY || "true", false],
   ["email_ready", "APPWRITE_EMAIL_READY", process.env.APPWRITE_EMAIL_READY || "false", false],
   ["google_calendar_ready", "GOOGLE_CALENDAR_READY", process.env.GOOGLE_CALENDAR_READY || "false", false],
-  ["microsoft_calendar_ready", "MICROSOFT_CALENDAR_READY", process.env.MICROSOFT_CALENDAR_READY || "false", false],
   ["stripe_ready", "STRIPE_READY", process.env.STRIPE_READY || "false", false],
-  ["custom_domain_ready", "CUSTOM_DOMAIN_READY", process.env.CUSTOM_DOMAIN_READY || "false", false],
-  ["app_public_url", "APP_PUBLIC_URL", process.env.APP_PUBLIC_URL || "https://cognora-ai.khanjabir909.chatgpt.site", false],
+  ["app_public_url", "APP_PUBLIC_URL", process.env.APP_PUBLIC_URL || "https://cognora-ai.appwrite.network", false],
 ];
 if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL) {
   variables.push(
@@ -88,13 +86,12 @@ if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.e
 for (const [variableId, key, value, secret] of [
   ["google_client_id", "GOOGLE_CLIENT_ID", process.env.GOOGLE_CLIENT_ID, false],
   ["google_client_secret", "GOOGLE_CLIENT_SECRET", process.env.GOOGLE_CLIENT_SECRET, true],
-  ["microsoft_client_id", "MICROSOFT_CLIENT_ID", process.env.MICROSOFT_CLIENT_ID, false],
-  ["microsoft_client_secret", "MICROSOFT_CLIENT_SECRET", process.env.MICROSOFT_CLIENT_SECRET, true],
   ["stripe_secret", "STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY, true],
   ["stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET, true],
+  ["stripe_webhook_secret_1", "STRIPE_WEBHOOK_SECRET_1", process.env.STRIPE_WEBHOOK_SECRET_1, true],
+  ["stripe_webhook_secret_2", "STRIPE_WEBHOOK_SECRET_2", process.env.STRIPE_WEBHOOK_SECRET_2, true],
   ["stripe_price_pro", "STRIPE_PRICE_PRO", process.env.STRIPE_PRICE_PRO, false],
   ["stripe_price_education", "STRIPE_PRICE_EDUCATION", process.env.STRIPE_PRICE_EDUCATION, false],
-  ["custom_domain", "CUSTOM_DOMAIN", process.env.CUSTOM_DOMAIN, false],
 ]) {
   if (value) variables.push([variableId, key, value, secret]);
 }

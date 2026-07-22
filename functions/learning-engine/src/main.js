@@ -853,10 +853,9 @@ function integrationReadiness() {
     appwriteWeb: process.env.APPWRITE_WEB_READY !== "false",
     email: process.env.APPWRITE_EMAIL_READY === "true",
     googleCalendar: process.env.GOOGLE_CALENDAR_READY === "true",
-    microsoftCalendar: process.env.MICROSOFT_CALENDAR_READY === "true",
     embeddings: Boolean(process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL),
     billing: process.env.STRIPE_READY === "true",
-    customDomain: process.env.CUSTOM_DOMAIN_READY === "true",
+    customDomain: Boolean(process.env.APP_PUBLIC_URL),
   };
 }
 
@@ -1121,15 +1120,14 @@ async function runLaunchReview(services) {
   return { ok: true, privatePilotReady, publicLaunchReady, checks, integrations, reviewedAt: new Date().toISOString() };
 }
 
-const ACTIVATION_PROVIDERS = ["email", "google-calendar", "microsoft-calendar", "embeddings", "stripe", "custom-domain"];
+const ACTIVATION_PROVIDERS = ["email", "google-calendar", "embeddings", "stripe", "custom-domain"];
 
 function providerConfiguration(provider) {
   if (provider === "email") return { configured: process.env.APPWRITE_EMAIL_READY === "true", detail: "Appwrite Messaging email provider" };
   if (provider === "google-calendar") return { configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET), detail: "Google OAuth calendar credentials" };
-  if (provider === "microsoft-calendar") return { configured: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET), detail: "Microsoft OAuth calendar credentials" };
   if (provider === "embeddings") return { configured: Boolean(process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL), detail: process.env.EMBEDDING_MODEL || "OpenAI-compatible embedding endpoint" };
-  if (provider === "stripe") return { configured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_PRICE_PRO), detail: "Stripe checkout, webhook, and Pro price" };
-  return { configured: Boolean(process.env.CUSTOM_DOMAIN), detail: process.env.CUSTOM_DOMAIN || "Production custom hostname" };
+  if (provider === "stripe") return { configured: Boolean(process.env.STRIPE_SECRET_KEY && (process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET_1 || process.env.STRIPE_WEBHOOK_SECRET_2) && process.env.STRIPE_PRICE_PRO), detail: "Stripe checkout, webhook, and Pro price" };
+  return { configured: Boolean(process.env.APP_PUBLIC_URL), detail: process.env.APP_PUBLIC_URL || "Production Appwrite Sites URL" };
 }
 
 async function verifyOneProvider(services, provider) {
@@ -1152,13 +1150,12 @@ async function verifyOneProvider(services, provider) {
     return { provider, status: "verified", configuration: { ...configuration, accountCountry: account.country || undefined, chargesEnabled: Boolean(account.charges_enabled) } };
   }
   if (provider === "custom-domain") {
-    if (process.env.CUSTOM_DOMAIN_READY !== "true") return { provider, status: "configured", configuration, error: "DNS and SSL have not been marked verified." };
-    const hostname = String(process.env.CUSTOM_DOMAIN).replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const response = await fetch(`https://${hostname}/manifest.webmanifest`, { redirect: "manual" });
-    if (response.status < 200 || response.status >= 400) throw new Error(`Custom domain returned HTTP ${response.status}.`);
+    const siteUrl = String(process.env.APP_PUBLIC_URL).replace(/\/$/, "");
+    const response = await fetch(`${siteUrl}/manifest.webmanifest`, { redirect: "manual" });
+    if (response.status < 200 || response.status >= 400) throw new Error(`Production site returned HTTP ${response.status}.`);
     return { provider, status: "verified", configuration };
   }
-  const readyFlag = provider === "google-calendar" ? process.env.GOOGLE_CALENDAR_READY : process.env.MICROSOFT_CALENDAR_READY;
+  const readyFlag = process.env.GOOGLE_CALENDAR_READY;
   return { provider, status: readyFlag === "true" ? "verified" : "configured", configuration, error: readyFlag === "true" ? undefined : "OAuth redirect and consent verification are still required." };
 }
 
