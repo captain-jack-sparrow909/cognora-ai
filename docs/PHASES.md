@@ -78,11 +78,22 @@ Delivered with account-level AI, storage, and collaboration limits; live usage m
 
 Delivered without weakening the private deployment. Invitation and cohort secrets are returned once, stored only as SHA-256 hashes, and verified inside the Appwrite Function. Course permissions are refreshed server-side when a learner joins. The launch review distinguishes a safe private pilot from a public launch and cannot enable public access. Email, Google, Microsoft, Stripe, embeddings, and custom-domain readiness remain off until their real credentials and DNS are supplied.
 
-## Phase 9 — External activation and public launch
+## Phase 9 — Production activation gate ⚠️ External inputs required
 
-- Connect and verify the Appwrite email sender
-- Supply Google and Microsoft OAuth credentials and activate two-way calendar sync
-- Choose an embedding provider and backfill existing material vectors
-- Connect Stripe plans, checkout, webhooks, and entitlement lifecycle updates
-- Add the production custom domain and complete DNS/SSL validation
-- Run the final security/load review, approve the first cohort, and explicitly change the Sites access policy
+- Live, server-side verification for Appwrite email, Google/Microsoft calendar credentials, embeddings, Stripe, and the custom hostname
+- Persisted provider activation evidence with configured, verified, and error states
+- Bounded embedding backfill for existing private source passages
+- Stripe Checkout plus a separately deployable, signature-verified webhook that updates subscriptions and entitlements idempotently
+- Persisted final launch approvals that combine private-pilot checks with every verified external provider
+- A production activation center that keeps unavailable actions disabled and lists exact blockers
+
+The activation layer is delivered and privately deployed. The provider audit accurately found no Appwrite email provider, calendar OAuth credentials, embedding endpoint, Stripe credentials/prices, or custom domain. Therefore the final approval remains blocked and Sites access remains owner-only. No readiness flag is promoted merely because UI or schema support exists.
+
+## Phase 10 — Provider hookup and first public cohort
+
+- Add and verify the chosen email provider and sender
+- Register calendar OAuth apps, redirect URIs, consent scopes, and two-way sync tests
+- Connect the embedding endpoint and complete the source-vector backfill
+- Add Stripe secrets and prices, deploy the billing webhook, and complete a test subscription lifecycle
+- Attach the chosen custom hostname and complete DNS/SSL validation
+- Re-run the final approval, explicitly approve the Sites access change, and open the first production cohort

@@ -1121,6 +1121,164 @@ async function runLaunchReview(services) {
   return { ok: true, privatePilotReady, publicLaunchReady, checks, integrations, reviewedAt: new Date().toISOString() };
 }
 
+const ACTIVATION_PROVIDERS = ["email", "google-calendar", "microsoft-calendar", "embeddings", "stripe", "custom-domain"];
+
+function providerConfiguration(provider) {
+  if (provider === "email") return { configured: process.env.APPWRITE_EMAIL_READY === "true", detail: "Appwrite Messaging email provider" };
+  if (provider === "google-calendar") return { configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET), detail: "Google OAuth calendar credentials" };
+  if (provider === "microsoft-calendar") return { configured: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET), detail: "Microsoft OAuth calendar credentials" };
+  if (provider === "embeddings") return { configured: Boolean(process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL), detail: process.env.EMBEDDING_MODEL || "OpenAI-compatible embedding endpoint" };
+  if (provider === "stripe") return { configured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_PRICE_PRO), detail: "Stripe checkout, webhook, and Pro price" };
+  return { configured: Boolean(process.env.CUSTOM_DOMAIN), detail: process.env.CUSTOM_DOMAIN || "Production custom hostname" };
+}
+
+async function verifyOneProvider(services, provider) {
+  const configuration = providerConfiguration(provider);
+  if (!configuration.configured && provider !== "email") return { provider, status: "unconfigured", configuration, error: "Required production configuration is missing." };
+  if (provider === "email") {
+    const result = await services.admin.messaging.listProviders({ total: false });
+    const enabled = result.providers.some((candidate) => candidate.enabled && ["email", "smtp", "mailgun", "sendgrid"].includes(String(candidate.type || "").toLowerCase()));
+    return { provider, status: enabled && process.env.APPWRITE_EMAIL_READY === "true" ? "verified" : enabled ? "configured" : "unconfigured", configuration: { configured: enabled, detail: enabled ? "Enabled Appwrite email provider detected" : configuration.detail }, error: enabled ? undefined : "No enabled Appwrite email provider was detected." };
+  }
+  if (provider === "embeddings") {
+    const vector = (await embedTexts(["Cognora provider readiness check"]))[0];
+    if (!vector?.length) throw new Error("The embedding provider returned no vector.");
+    return { provider, status: "verified", configuration: { ...configuration, dimensions: vector.length } };
+  }
+  if (provider === "stripe") {
+    const response = await fetch("https://api.stripe.com/v1/account", { headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` } });
+    if (!response.ok) throw new Error(`Stripe account verification failed (${response.status}).`);
+    const account = await response.json();
+    return { provider, status: "verified", configuration: { ...configuration, accountCountry: account.country || undefined, chargesEnabled: Boolean(account.charges_enabled) } };
+  }
+  if (provider === "custom-domain") {
+    if (process.env.CUSTOM_DOMAIN_READY !== "true") return { provider, status: "configured", configuration, error: "DNS and SSL have not been marked verified." };
+    const hostname = String(process.env.CUSTOM_DOMAIN).replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const response = await fetch(`https://${hostname}/manifest.webmanifest`, { redirect: "manual" });
+    if (response.status < 200 || response.status >= 400) throw new Error(`Custom domain returned HTTP ${response.status}.`);
+    return { provider, status: "verified", configuration };
+  }
+  const readyFlag = provider === "google-calendar" ? process.env.GOOGLE_CALENDAR_READY : process.env.MICROSOFT_CALENDAR_READY;
+  return { provider, status: readyFlag === "true" ? "verified" : "configured", configuration, error: readyFlag === "true" ? undefined : "OAuth redirect and consent verification are still required." };
+}
+
+async function persistProviderActivation(services, result) {
+  const now = new Date().toISOString();
+  const row = await services.admin.tables.upsertRow({
+    databaseId: services.databaseId,
+    tableId: "provider_activations",
+    rowId: result.provider,
+    data: {
+      provider: result.provider,
+      status: result.status,
+      configurationJson: JSON.stringify(result.configuration || {}).slice(0, 20_000),
+      verifiedAt: result.status === "verified" ? now : undefined,
+      lastCheckedAt: now,
+      lastError: text(result.error).slice(0, 20_000) || undefined,
+      updatedBy: services.userId,
+    },
+    permissions: [Permission.read(Role.user(services.userId))],
+  });
+  return { provider: row.provider, status: row.status, configuration: result.configuration, verifiedAt: row.verifiedAt, lastCheckedAt: row.lastCheckedAt, error: row.lastError };
+}
+
+async function verifyProviderActivations(services) {
+  await requireLaunchAdmin(services);
+  const results = [];
+  for (const provider of ACTIVATION_PROVIDERS) {
+    try { results.push(await persistProviderActivation(services, await verifyOneProvider(services, provider))); }
+    catch (caught) {
+      results.push(await persistProviderActivation(services, { provider, status: "error", configuration: providerConfiguration(provider), error: caught instanceof Error ? caught.message : "Provider verification failed." }));
+    }
+  }
+  await auditSecurityEvent(services, { eventName: "provider_verification_completed", targetType: "deployment", metadata: { verified: results.filter((result) => result.status === "verified").map((result) => result.provider), blocked: results.filter((result) => result.status !== "verified").map((result) => result.provider) }, severity: results.every((result) => result.status === "verified") ? "info" : "warning" });
+  return { ok: true, providers: results, allVerified: results.every((result) => result.status === "verified"), checkedAt: new Date().toISOString() };
+}
+
+async function getProviderActivationSnapshot(services) {
+  const { tables, databaseId, userId, admin } = services;
+  const subscriptions = await tables.listRows({ databaseId, tableId: "subscriptions", queries: [Query.equal("ownerId", [userId]), Query.limit(1)] }).catch(() => ({ rows: [] }));
+  const fallbackProviders = ACTIVATION_PROVIDERS.map((provider) => ({ provider, status: providerConfiguration(provider).configured ? "configured" : "unconfigured", configuration: providerConfiguration(provider) }));
+  if (!admin) return { ok: true, isAdmin: false, providers: fallbackProviders, subscription: subscriptions.rows[0] || null };
+  const admins = await admin.tables.listRows({ databaseId, tableId: "launch_admins", queries: [Query.equal("userId", [userId]), Query.limit(1)] });
+  const isAdmin = admins.rows.length > 0;
+  if (!isAdmin) return { ok: true, isAdmin: false, providers: fallbackProviders, subscription: subscriptions.rows[0] || null };
+  const [activations, approvals] = await Promise.all([
+    admin.tables.listRows({ databaseId, tableId: "provider_activations", queries: [Query.limit(20)] }),
+    admin.tables.listRows({ databaseId, tableId: "launch_approvals", queries: [Query.orderDesc("createdAt"), Query.limit(1)] }),
+  ]);
+  const byProvider = new Map(activations.rows.map((row) => [row.provider, row]));
+  const providers = fallbackProviders.map((fallback) => {
+    const row = byProvider.get(fallback.provider);
+    if (!row) return fallback;
+    let configuration = fallback.configuration;
+    try { configuration = JSON.parse(row.configurationJson || "{}"); } catch {}
+    return { provider: row.provider, status: row.status, configuration, verifiedAt: row.verifiedAt, lastCheckedAt: row.lastCheckedAt, error: row.lastError };
+  });
+  const approval = approvals.rows[0] ? { id: approvals.rows[0].$id, status: approvals.rows[0].status, privatePilotReady: approvals.rows[0].privatePilotReady, publicLaunchReady: approvals.rows[0].publicLaunchReady, blockers: JSON.parse(approvals.rows[0].blockersJson || "[]"), createdAt: approvals.rows[0].createdAt, approvedAt: approvals.rows[0].approvedAt } : null;
+  return { ok: true, isAdmin, providers, subscription: subscriptions.rows[0] || null, approval };
+}
+
+async function backfillEmbeddings(services, body) {
+  await requireLaunchAdmin(services);
+  if (!providerConfiguration("embeddings").configured) throw new Error("Configure and verify an embedding provider before starting a backfill.");
+  const limit = clamp(body.limit || 25, 1, 50);
+  const rows = await services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "knowledge_chunks", queries: [Query.orderAsc("createdAt"), Query.limit(200)], total: false });
+  const pending = rows.rows.filter((row) => !row.embeddingJson || !row.embeddingModel).slice(0, limit);
+  if (!pending.length) return { ok: true, processed: 0, remainingInWindow: 0, complete: true };
+  const vectors = await embedTexts(pending.map((row) => row.content.slice(0, 8_000)));
+  if (vectors.length !== pending.length) throw new Error("The embedding provider returned an incomplete batch.");
+  for (const [index, row] of pending.entries()) {
+    await services.admin.tables.updateRow({ databaseId: services.databaseId, tableId: "knowledge_chunks", rowId: row.$id, data: { embeddingJson: JSON.stringify(vectors[index]).slice(0, 60_000), embeddingModel: process.env.EMBEDDING_MODEL.slice(0, 96) } });
+  }
+  await auditSecurityEvent(services, { eventName: "embedding_backfill_completed", targetType: "knowledge_chunks", metadata: { processed: pending.length, model: process.env.EMBEDDING_MODEL } });
+  return { ok: true, processed: pending.length, remainingInWindow: rows.rows.filter((row) => !row.embeddingJson || !row.embeddingModel).length - pending.length, complete: pending.length < limit };
+}
+
+async function createBillingCheckout(services, body) {
+  if (!services.admin) throw new Error("Billing is unavailable until the function key is configured.");
+  const configuration = providerConfiguration("stripe");
+  if (!configuration.configured) throw new Error("Stripe checkout is not configured yet.");
+  const user = await services.admin.users.get({ userId: services.userId });
+  const baseUrl = (process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+  if (!baseUrl) throw new Error("The production application URL is missing.");
+  const params = new URLSearchParams({
+    mode: "subscription",
+    "line_items[0][price]": process.env.STRIPE_PRICE_PRO,
+    "line_items[0][quantity]": "1",
+    success_url: `${baseUrl}/?billing=success`,
+    cancel_url: `${baseUrl}/?billing=cancelled`,
+    client_reference_id: services.userId,
+    customer_email: user.email,
+    "metadata[appwriteUserId]": services.userId,
+    "subscription_data[metadata][appwriteUserId]": services.userId,
+  });
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", { method: "POST", headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" }, body: params });
+  const payload = await response.json();
+  if (!response.ok || !payload.url) throw new Error(payload.error?.message || `Stripe checkout failed (${response.status}).`);
+  await auditSecurityEvent(services, { eventName: "billing_checkout_created", targetType: "subscription", metadata: { plan: body.plan === "education" ? "education" : "pro" } });
+  return { ok: true, checkoutUrl: payload.url };
+}
+
+async function createFinalLaunchApproval(services) {
+  await requireLaunchAdmin(services);
+  const [review, activation] = await Promise.all([runLaunchReview(services), verifyProviderActivations(services)]);
+  const providerBlockers = activation.providers.filter((provider) => provider.status !== "verified").map((provider) => `${provider.provider}: ${provider.error || "verification required"}`);
+  const checkBlockers = review.checks.filter((check) => !check.passed).map((check) => check.label);
+  const blockers = [...checkBlockers, ...providerBlockers];
+  const publicLaunchReady = review.privatePilotReady && activation.allVerified;
+  const now = new Date().toISOString();
+  const approval = await services.admin.tables.createRow({
+    databaseId: services.databaseId,
+    tableId: "launch_approvals",
+    rowId: ID.unique(),
+    data: { requestedBy: services.userId, status: publicLaunchReady ? "approved" : "blocked", privatePilotReady: review.privatePilotReady, publicLaunchReady, blockersJson: JSON.stringify(blockers), checksJson: JSON.stringify({ launch: review.checks, providers: activation.providers.map(({ provider, status }) => ({ provider, status })) }), createdAt: now, approvedAt: publicLaunchReady ? now : undefined },
+    permissions: [Permission.read(Role.user(services.userId))],
+  });
+  await auditSecurityEvent(services, { eventName: "final_launch_approval_evaluated", targetType: "launch_approval", targetId: approval.$id, metadata: { status: approval.status, blockerCount: blockers.length }, severity: publicLaunchReady ? "info" : "warning" });
+  return { ok: true, approval: { id: approval.$id, status: approval.status, privatePilotReady: approval.privatePilotReady, publicLaunchReady: approval.publicLaunchReady, blockers, createdAt: approval.createdAt, approvedAt: approval.approvedAt }, providers: activation.providers, checks: review.checks };
+}
+
 async function prepareJob(services, body) {
   const jobId = text(body.jobId);
   if (!jobId) return;
@@ -1237,6 +1395,11 @@ async function main({ req, res, log, error }) {
     else if (body.action === "create_launch_cohort") result = await createLaunchCohort(services, body);
     else if (body.action === "join_launch_cohort") result = await joinLaunchCohort(services, body);
     else if (body.action === "run_launch_review") result = await runLaunchReview(services);
+    else if (body.action === "get_provider_activation_snapshot") result = await getProviderActivationSnapshot(services);
+    else if (body.action === "verify_provider_activations") result = await verifyProviderActivations(services);
+    else if (body.action === "backfill_embeddings") result = await backfillEmbeddings(services, body);
+    else if (body.action === "create_billing_checkout") result = await createBillingCheckout(services, body);
+    else if (body.action === "create_final_launch_approval") result = await createFinalLaunchApproval(services);
     else throw new Error("Unknown learning engine action.");
     if (body.action === "generate_plan") await syncReminders(services).catch(() => undefined);
     await completeJob(services);

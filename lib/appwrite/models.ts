@@ -357,6 +357,45 @@ export type LaunchReview = {
   reviewedAt: string;
 };
 
+export type ProviderActivation = {
+  provider: "email" | "google-calendar" | "microsoft-calendar" | "embeddings" | "stripe" | "custom-domain";
+  status: "unconfigured" | "configured" | "verifying" | "verified" | "error";
+  configuration: { configured?: boolean; detail?: string; dimensions?: number; accountCountry?: string; chargesEnabled?: boolean };
+  verifiedAt?: string;
+  lastCheckedAt?: string;
+  error?: string;
+};
+
+export type Subscription = Models.Row & {
+  ownerId: string;
+  provider: "stripe";
+  plan: "pro" | "education";
+  status: "inactive" | "trialing" | "active" | "past-due" | "canceled";
+  externalCustomerId?: string;
+  externalSubscriptionId?: string;
+  priceId?: string;
+  currentPeriodEnd?: string;
+  updatedAt: string;
+};
+
+export type LaunchApproval = {
+  id: string;
+  status: "blocked" | "approved" | "revoked";
+  privatePilotReady: boolean;
+  publicLaunchReady: boolean;
+  blockers: string[];
+  createdAt: string;
+  approvedAt?: string;
+};
+
+export type ProviderActivationSnapshot = {
+  ok: boolean;
+  isAdmin: boolean;
+  providers: ProviderActivation[];
+  subscription: Subscription | null;
+  approval?: LaunchApproval | null;
+};
+
 export type LaunchSnapshot = {
   ok: boolean;
   isAdmin: boolean;

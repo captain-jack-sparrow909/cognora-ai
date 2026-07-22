@@ -4,7 +4,7 @@ Cognora AI is a personal learning operating system that connects planning, lectu
 
 ## Current product state
 
-Phase 8 provides:
+Phase 9 provides:
 
 - Appwrite email/password authentication
 - private student profiles and onboarding preferences
@@ -41,8 +41,12 @@ Phase 8 provides:
 - shared course intelligence with personal evidence and submissions kept private
 - capacity-limited founding cohorts and content-free security audit events
 - audited private-pilot/public-launch gates plus a concurrent launch load check
+- persisted production-provider verification with truthful configured and verified states
+- bounded embedding backfill controls
+- Stripe Checkout and a signature-verified, idempotent subscription webhook
+- immutable final launch approval evidence that cannot change Sites access
 
-Email, calendar OAuth, vector embeddings, billing, and custom-domain activation are provider-ready but remain disabled until their external credentials and DNS are connected.
+Email, calendar OAuth, vector embeddings, billing, and custom-domain activation are provider-ready but remain disabled because their external credentials, provider records, and DNS are not yet connected.
 
 ## Stack
 
@@ -58,9 +62,10 @@ Email, calendar OAuth, vector embeddings, billing, and custom-domain activation 
 2. Install dependencies with `npm install`.
 3. Provision the Appwrite resources with `npm run appwrite:provision`.
 4. Deploy the learning function with `npm run appwrite:deploy-function`.
-5. Optionally validate the full temporary learning, intelligence, retrieval, beta, launch-administration, operations, and reminder loop with `npm run appwrite:smoke-learning`.
-6. Optionally run the concurrent launch snapshot check with `npm run appwrite:load-launch`.
-7. Start the app with `npm run dev`.
+5. After configuring Stripe, deploy the signed webhook with `npm run appwrite:deploy-billing-webhook`.
+6. Optionally validate the full temporary learning, intelligence, retrieval, beta, launch-administration, operations, and reminder loop with `npm run appwrite:smoke-learning`.
+7. Optionally run the concurrent launch snapshot check with `npm run appwrite:load-launch`.
+8. Start the app with `npm run dev`.
 
 ## Validation
 

@@ -319,13 +319,17 @@ try {
   created.cohortId = cohort.cohortId;
   const cohortJoin = await runAction(memberFunctions, ExecutionMethod, { action: "join_launch_cohort", cohortCode: cohort.cohortCode }, false);
   const launchReview = await runAction(functions, ExecutionMethod, { action: "run_launch_review" }, false);
+  const providerVerification = await runAction(functions, ExecutionMethod, { action: "verify_provider_activations" }, false);
+  const activationSnapshot = await runAction(functions, ExecutionMethod, { action: "get_provider_activation_snapshot" }, false);
+  const finalApproval = await runAction(functions, ExecutionMethod, { action: "create_final_launch_approval" }, false);
   const [sharedCourse, sharedMaterials] = await Promise.all([
     memberTables.getRow({ databaseId, tableId: "courses", rowId: created.courseId }),
     memberTables.listRows({ databaseId, tableId: "materials", queries: [Query.equal("courseId", [created.courseId]), Query.limit(10)] }),
   ]);
   if (accepted.courseId !== created.courseId || sharedCourse.$id !== created.courseId || !sharedMaterials.rows.length || cohortJoin.cohortId !== cohort.cohortId || !Array.isArray(launchReview.checks)) throw new Error("Phase 8 collaboration, cohort, or launch-review flow failed.");
+  if (providerVerification.allVerified || activationSnapshot.providers.length !== 6 || finalApproval.approval.status !== "blocked" || finalApproval.approval.publicLaunchReady) throw new Error("Phase 9 provider and final-approval gates did not remain safely blocked without production credentials.");
 
-  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback, entitlements, launchPreferences, calendarConnections, courseMembers, courseInvites, cohortMemberships, securityEvents] = await Promise.all([
+  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback, entitlements, launchPreferences, calendarConnections, courseMembers, courseInvites, cohortMemberships, securityEvents, providerActivations, launchApprovals] = await Promise.all([
     tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] }),
@@ -343,6 +347,8 @@ try {
     tables.listRows({ databaseId, tableId: "course_invites", queries: [Query.equal("ownerId", [created.userId])] }),
     adminTables.listRows({ databaseId, tableId: "cohort_memberships", queries: [Query.equal("cohortId", [cohort.cohortId])] }),
     adminTables.listRows({ databaseId, tableId: "security_events", queries: [Query.equal("targetId", [created.courseId])] }),
+    adminTables.listRows({ databaseId, tableId: "provider_activations", queries: [Query.limit(20)] }),
+    adminTables.listRows({ databaseId, tableId: "launch_approvals", queries: [Query.equal("requestedBy", [created.userId])] }),
   ]);
   if (!reports.rows.length || !gapRows.rows.length || !roadmaps.rows.length || !roadmapSteps.rows.length || !coachMessages.rows.length) {
     throw new Error("The Phase 4 function actions completed without persisting the full intelligence loop.");
@@ -352,6 +358,7 @@ try {
   if (!betaProfiles.rows[0]?.analyticsEnabled || !analyticsEvents.rows.length || !productFeedback.rows.length) throw new Error("Phase 6 beta consent, analytics, and feedback records were not persisted.");
   if (!entitlements.rows.length || !launchPreferences.rows.length || !calendarConnections.rows.length || !courseMembers.rows.length || !launchSnapshot.isAdmin || !launchSnapshot.integrations?.appwriteWeb) throw new Error("Phase 7 launch controls, entitlements, collaboration, and administration were not persisted.");
   if (!courseInvites.rows.length || !cohortMemberships.rows.length || !securityEvents.rows.length) throw new Error("Phase 8 invitation, cohort, and audit records were not persisted.");
+  if (providerActivations.rows.length !== 6 || !launchApprovals.rows.length) throw new Error("Phase 9 provider verification and launch approval evidence were not persisted.");
   console.log(JSON.stringify({
     function: functionId,
     materialStatus: "ready",
@@ -383,6 +390,9 @@ try {
     cohort: cohortJoin.cohortName,
     launchChecks: launchReview.checks.length,
     securityEvents: securityEvents.rows.length,
+    providersVerified: providerVerification.providers.filter((provider) => provider.status === "verified").length,
+    publicLaunchReady: finalApproval.approval.publicLaunchReady,
+    launchApprovalStatus: finalApproval.approval.status,
   }, null, 2));
 } finally {
   if (created.courseId) {
@@ -394,6 +404,8 @@ try {
       await deleteMatching(tableId, [Query.equal(actualField, [value])]).catch(() => undefined);
     }
     await deleteMatching("security_events", [Query.equal("actorId", [created.userId, created.memberUserId])]).catch(() => undefined);
+    await deleteMatching("provider_activations", [Query.equal("updatedBy", [created.userId])]).catch(() => undefined);
+    await deleteMatching("launch_approvals", [Query.equal("requestedBy", [created.userId])]).catch(() => undefined);
     if (created.cohortId) {
       await deleteMatching("cohort_memberships", [Query.equal("cohortId", [created.cohortId])]).catch(() => undefined);
       await adminTables.deleteRow({ databaseId, tableId: "launch_cohorts", rowId: created.cohortId }).catch(() => undefined);

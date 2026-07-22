@@ -73,6 +73,13 @@
 - `cohort_memberships`: private learner membership in a launch cohort
 - `security_events`: content-free audit records for security-relevant launch actions
 
+### Phase 9 tables — provisioned
+
+- `provider_activations`: sanitized, server-verified activation evidence for each production dependency
+- `subscriptions`: private Stripe subscription state linked to Appwrite users
+- `billing_events`: idempotent, content-free records of signature-verified Stripe events
+- `launch_approvals`: immutable final-gate evaluations with blockers and approval evidence
+
 ### Planned tables
 
 `lectures`, `concept_relationships`, `study_sessions`, and `assessments`.
@@ -100,6 +107,11 @@
 - `create-course-invite` / `accept-course-invite`: server-verified share-code collaboration with bounded uses, expiry, and course permission refresh
 - `create-launch-cohort` / `join-launch-cohort`: administrator-created, capacity-limited cohort enrollment using hashed share codes
 - `run-launch-review`: an audited private-pilot/public-launch gate that checks operational health without enabling access
+- `get-provider-activation-snapshot` / `verify-provider-activations`: sanitized provider state plus live server-side verification
+- `backfill-embeddings`: administrator-only, bounded vector backfill after the provider passes configuration checks
+- `create-billing-checkout`: server-created Stripe Checkout sessions with Appwrite user metadata
+- `create-final-launch-approval`: combines controlled-cohort health with all verified production dependencies and persists the decision
+- `billing-webhook`: separately deployable public Function that accepts only valid Stripe signatures, deduplicates events, and updates private subscriptions and entitlements
 - `deepseek-gateway`: the learning engine owns normalized JSON model access, one bounded retry for transient failures, token accounting, structured operational logs, and a configurable daily request limit
 
 Long-running AI actions create a user-owned `ai_jobs` row before execution. The browser subscribes to that exact row with Appwrite Realtime and retains a polling fallback. The function advances the job through queued, processing, reasoning, persistence, completed, or failed states, then emits a private notification. Operational records exclude prompt, submission, and response content.
@@ -119,3 +131,7 @@ Phase 8 exposes course titles, uploaded material, companion insights, concepts, 
 ### Launch provider boundary
 
 Appwrite web origins are live. Email, Google Calendar, Microsoft Calendar, embeddings, Stripe, and custom-domain switches default to false and are surfaced as setup-required. Enabling a switch requires the corresponding provider credentials or validated DNS; the interface never treats a stored preference as proof that an external integration is connected.
+
+### Production activation boundary
+
+Phase 9 separates “configured” from “verified.” Email verification inspects enabled Appwrite Messaging providers; embeddings perform a live vector probe; Stripe reads the authenticated account; calendars require credentials plus an explicit post-consent readiness flag; and the custom hostname requires both configured DNS/SSL state and a live manifest response. Final approval does not alter Sites access. Public access remains a distinct user-authorized hosting action.

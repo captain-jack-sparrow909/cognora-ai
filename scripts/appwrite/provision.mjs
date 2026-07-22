@@ -665,6 +665,84 @@ const definitions = [
       { key: "target_created", type: TablesDBIndexType.Key, columns: ["targetId", "createdAt"] },
     ],
   },
+  {
+    id: "provider_activations",
+    name: "Production provider verification state",
+    createPermissions: [],
+    columns: [
+      { key: "provider", type: "enum", elements: ["email", "google-calendar", "microsoft-calendar", "embeddings", "stripe", "custom-domain"], required: true },
+      { key: "status", type: "enum", elements: ["unconfigured", "configured", "verifying", "verified", "error"], required: true },
+      { key: "configurationJson", type: "text", required: true },
+      { key: "verifiedAt", type: "datetime", required: false },
+      { key: "lastCheckedAt", type: "datetime", required: true },
+      { key: "lastError", type: "text", required: false },
+      { key: "updatedBy", type: "varchar", size: 36, required: true },
+    ],
+    indexes: [
+      { key: "provider_unique", type: TablesDBIndexType.Unique, columns: ["provider"] },
+      { key: "status_checked", type: TablesDBIndexType.Key, columns: ["status", "lastCheckedAt"] },
+      { key: "updated_by", type: TablesDBIndexType.Key, columns: ["updatedBy"] },
+    ],
+  },
+  {
+    id: "subscriptions",
+    name: "Billing subscription lifecycle",
+    createPermissions: [],
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "provider", type: "enum", elements: ["stripe"], required: true },
+      { key: "plan", type: "enum", elements: ["pro", "education"], required: true },
+      { key: "status", type: "enum", elements: ["inactive", "trialing", "active", "past-due", "canceled"], required: true },
+      { key: "externalCustomerId", type: "varchar", size: 128, required: false },
+      { key: "externalSubscriptionId", type: "varchar", size: 128, required: false },
+      { key: "priceId", type: "varchar", size: 128, required: false },
+      { key: "currentPeriodEnd", type: "datetime", required: false },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] },
+      { key: "subscription_lookup", type: TablesDBIndexType.Key, columns: ["externalSubscriptionId"] },
+      { key: "status_updated", type: TablesDBIndexType.Key, columns: ["status", "updatedAt"] },
+    ],
+  },
+  {
+    id: "billing_events",
+    name: "Verified billing webhook events",
+    createPermissions: [],
+    columns: [
+      { key: "eventId", type: "varchar", size: 128, required: true },
+      { key: "eventType", type: "varchar", size: 128, required: true },
+      { key: "status", type: "enum", elements: ["received", "processed", "ignored", "failed"], required: true },
+      { key: "userId", type: "varchar", size: 36, required: false },
+      { key: "metadataJson", type: "text", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+      { key: "processedAt", type: "datetime", required: false },
+    ],
+    indexes: [
+      { key: "event_unique", type: TablesDBIndexType.Unique, columns: ["eventId"] },
+      { key: "status_created", type: TablesDBIndexType.Key, columns: ["status", "createdAt"] },
+    ],
+  },
+  {
+    id: "launch_approvals",
+    name: "Final launch approval evidence",
+    createPermissions: [],
+    columns: [
+      { key: "requestedBy", type: "varchar", size: 36, required: true },
+      { key: "status", type: "enum", elements: ["blocked", "approved", "revoked"], required: true },
+      { key: "privatePilotReady", type: "boolean", required: true },
+      { key: "publicLaunchReady", type: "boolean", required: true },
+      { key: "blockersJson", type: "text", required: true },
+      { key: "checksJson", type: "text", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+      { key: "approvedAt", type: "datetime", required: false },
+    ],
+    indexes: [
+      { key: "requester_created", type: TablesDBIndexType.Key, columns: ["requestedBy", "createdAt"] },
+      { key: "status_created", type: TablesDBIndexType.Key, columns: ["status", "createdAt"] },
+      { key: "created_only", type: TablesDBIndexType.Key, columns: ["createdAt"] },
+    ],
+  },
 ];
 
 function isNotFound(error) {
@@ -876,4 +954,4 @@ for (const [index, hostname] of webHosts.entries()) {
   console.log(`Registered web platform: ${hostname}`);
 }
 
-console.log("Appwrite Phase 8 resources are ready.");
+console.log("Appwrite Phase 9 resources are ready.");

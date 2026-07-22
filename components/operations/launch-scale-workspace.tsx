@@ -8,6 +8,7 @@ import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
 import { executeLearningAction } from "@/lib/appwrite/learning-engine";
 import type { CalendarConnection, Course, CourseInviteAcceptance, CourseInviteResult, Entitlement, LaunchCohortResult, LaunchPreferences, LaunchReview, LaunchSnapshot } from "@/lib/appwrite/models";
 import { privateUserPermissions } from "@/lib/appwrite/permissions";
+import { ProviderActivationWorkspace } from "./provider-activation-workspace";
 
 const integrationLabels: Array<{ key: keyof LaunchSnapshot["integrations"]; label: string; detail: string; icon: typeof Mail }> = [
   { key: "appwriteWeb", label: "Web origins", detail: "Production and local Appwrite origins", icon: Globe2 },
@@ -156,6 +157,7 @@ export function LaunchScaleWorkspace({ userId }: { userId: string }) {
           <p className="operations-note"><ShieldCheck size={15} />Every invite, cohort enrollment, rejected code, and launch review creates a content-free security event. Public access is never enabled by a preference toggle.</p>
         </section>
       </div>
+      <ProviderActivationWorkspace />
     </>}
   </section>;
 }

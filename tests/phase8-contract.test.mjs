@@ -32,5 +32,5 @@ test("keeps the Phase 8 collaboration and launch-gate contract wired end to end"
   assert.match(launch, /Public access is never enabled by a preference toggle/);
   assert.match(load, /LAUNCH_LOAD_CONCURRENCY/);
   assert.match(packageJson, /appwrite:load-launch/);
-  assert.match(page, /Phase 8 · Launch gated/);
+  assert.match(page, /Phase 9 · Providers gated/);
 });

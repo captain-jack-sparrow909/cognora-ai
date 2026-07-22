@@ -48,7 +48,7 @@ const settings = {
   logging: true,
   entrypoint: "src/main.js",
   commands: "npm install",
-  scopes: [ProjectKeyScopes.RowsRead, ProjectKeyScopes.RowsWrite, ProjectKeyScopes.FilesRead, ProjectKeyScopes.FilesWrite, ProjectKeyScopes.UsersRead, ProjectKeyScopes.MessagesWrite],
+  scopes: [ProjectKeyScopes.RowsRead, ProjectKeyScopes.RowsWrite, ProjectKeyScopes.FilesRead, ProjectKeyScopes.FilesWrite, ProjectKeyScopes.UsersRead, ProjectKeyScopes.MessagesRead, ProjectKeyScopes.MessagesWrite, ProjectKeyScopes.ProvidersRead],
 };
 
 if (current) {
@@ -76,6 +76,7 @@ const variables = [
   ["microsoft_calendar_ready", "MICROSOFT_CALENDAR_READY", process.env.MICROSOFT_CALENDAR_READY || "false", false],
   ["stripe_ready", "STRIPE_READY", process.env.STRIPE_READY || "false", false],
   ["custom_domain_ready", "CUSTOM_DOMAIN_READY", process.env.CUSTOM_DOMAIN_READY || "false", false],
+  ["app_public_url", "APP_PUBLIC_URL", process.env.APP_PUBLIC_URL || "https://cognora-ai.khanjabir909.chatgpt.site", false],
 ];
 if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL) {
   variables.push(
@@ -83,6 +84,19 @@ if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.e
     ["embedding_base", "EMBEDDING_BASE_URL", process.env.EMBEDDING_BASE_URL, false],
     ["embedding_model", "EMBEDDING_MODEL", process.env.EMBEDDING_MODEL, false],
   );
+}
+for (const [variableId, key, value, secret] of [
+  ["google_client_id", "GOOGLE_CLIENT_ID", process.env.GOOGLE_CLIENT_ID, false],
+  ["google_client_secret", "GOOGLE_CLIENT_SECRET", process.env.GOOGLE_CLIENT_SECRET, true],
+  ["microsoft_client_id", "MICROSOFT_CLIENT_ID", process.env.MICROSOFT_CLIENT_ID, false],
+  ["microsoft_client_secret", "MICROSOFT_CLIENT_SECRET", process.env.MICROSOFT_CLIENT_SECRET, true],
+  ["stripe_secret", "STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY, true],
+  ["stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET, true],
+  ["stripe_price_pro", "STRIPE_PRICE_PRO", process.env.STRIPE_PRICE_PRO, false],
+  ["stripe_price_education", "STRIPE_PRICE_EDUCATION", process.env.STRIPE_PRICE_EDUCATION, false],
+  ["custom_domain", "CUSTOM_DOMAIN", process.env.CUSTOM_DOMAIN, false],
+]) {
+  if (value) variables.push([variableId, key, value, secret]);
 }
 const existing = await functions.listVariables({ functionId, total: false });
 for (const [variableId, key, value, secret] of variables) {
