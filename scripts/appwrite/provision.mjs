@@ -2,6 +2,7 @@ import {
   Client,
   Compression,
   Permission,
+  Project,
   Role,
   Storage,
   TablesDB,
@@ -27,6 +28,7 @@ const client = new Client()
 
 const tables = new TablesDB(client);
 const storage = new Storage(client);
+const project = new Project(client);
 const databaseId = process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID;
 const bucketId = process.env.APPWRITE_MATERIALS_BUCKET_ID ?? process.env.NEXT_PUBLIC_APPWRITE_MATERIALS_BUCKET_ID;
 const authenticatedCreate = [Permission.create(Role.users())];
@@ -456,6 +458,8 @@ const definitions = [
       { key: "materialId", type: "varchar", size: 36, required: true },
       { key: "chunkIndex", type: "integer", min: 0, max: 500, required: true },
       { key: "content", type: "text", required: true },
+      { key: "embeddingJson", type: "text", required: false },
+      { key: "embeddingModel", type: "varchar", size: 96, required: false },
       { key: "createdAt", type: "datetime", required: true },
     ],
     indexes: [
@@ -510,6 +514,81 @@ const definitions = [
       { key: "owner_created", type: TablesDBIndexType.Key, columns: ["ownerId", "createdAt"] },
       { key: "status_created", type: TablesDBIndexType.Key, columns: ["status", "createdAt"] },
     ],
+  },
+  {
+    id: "entitlements",
+    name: "Learner plans and usage entitlements",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "plan", type: "enum", elements: ["founding-beta", "pro", "education"], required: true },
+      { key: "status", type: "enum", elements: ["active", "trialing", "paused"], required: true },
+      { key: "aiDailyLimit", type: "integer", min: 1, max: 10000, required: true },
+      { key: "storageLimitMb", type: "integer", min: 50, max: 1000000, required: true },
+      { key: "collaborationSeats", type: "integer", min: 1, max: 10000, required: true },
+      { key: "trialEndsAt", type: "datetime", required: false },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] },
+      { key: "plan_status", type: TablesDBIndexType.Key, columns: ["plan", "status"] },
+    ],
+  },
+  {
+    id: "launch_preferences",
+    name: "Staged release preferences",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "releaseChannel", type: "enum", elements: ["private-beta", "early-access", "general"], required: true },
+      { key: "autoUpdates", type: "boolean", required: false, default: true },
+      { key: "providerAlerts", type: "boolean", required: false, default: true },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [{ key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] }],
+  },
+  {
+    id: "calendar_connections",
+    name: "Calendar sync connections",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "provider", type: "enum", elements: ["google", "microsoft"], required: true },
+      { key: "status", type: "enum", elements: ["not-configured", "connected", "paused", "error"], required: true },
+      { key: "syncMode", type: "enum", elements: ["export", "import", "two-way"], required: true },
+      { key: "conflictPolicy", type: "enum", elements: ["ask", "cognora-wins", "calendar-wins"], required: true },
+      { key: "lastSyncAt", type: "datetime", required: false },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_provider", type: TablesDBIndexType.Unique, columns: ["ownerId", "provider"] },
+      { key: "owner_status", type: TablesDBIndexType.Key, columns: ["ownerId", "status"] },
+    ],
+  },
+  {
+    id: "course_members",
+    name: "Course collaboration memberships",
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "courseId", type: "varchar", size: 36, required: true },
+      { key: "memberId", type: "varchar", size: 36, required: true },
+      { key: "role", type: "enum", elements: ["owner", "editor", "viewer"], required: true },
+      { key: "status", type: "enum", elements: ["active", "invited", "revoked"], required: true },
+      { key: "joinedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "course_member", type: TablesDBIndexType.Unique, columns: ["courseId", "memberId"] },
+      { key: "owner_course", type: TablesDBIndexType.Key, columns: ["ownerId", "courseId"] },
+      { key: "member_status", type: TablesDBIndexType.Key, columns: ["memberId", "status"] },
+    ],
+  },
+  {
+    id: "launch_admins",
+    name: "Launch administration roles",
+    createPermissions: [],
+    columns: [
+      { key: "userId", type: "varchar", size: 36, required: true },
+      { key: "role", type: "enum", elements: ["owner", "operator"], required: true },
+      { key: "claimedAt", type: "datetime", required: true },
+    ],
+    indexes: [{ key: "user_unique", type: TablesDBIndexType.Unique, columns: ["userId"] }],
   },
 ];
 
@@ -642,7 +721,7 @@ for (const definition of definitions) {
         databaseId,
         tableId: definition.id,
         name: definition.name,
-        permissions: authenticatedCreate,
+        permissions: definition.createPermissions ?? authenticatedCreate,
         rowSecurity: true,
         enabled: true,
       });
@@ -662,7 +741,7 @@ for (const definition of definitions) {
       databaseId,
       tableId: definition.id,
       name: definition.name,
-      permissions: authenticatedCreate,
+      permissions: definition.createPermissions ?? authenticatedCreate,
       rowSecurity: true,
       enabled: true,
     });
@@ -713,4 +792,13 @@ try {
 }
 
 console.log("Secured bucket: course-materials");
-console.log("Appwrite Phase 6 resources are ready.");
+
+const webHosts = [...new Set((process.env.APPWRITE_WEB_HOSTNAMES || "localhost,cognora-ai.khanjabir909.chatgpt.site").split(",").map((host) => host.trim()).filter(Boolean))];
+const platforms = await project.listPlatforms({ total: false });
+for (const [index, hostname] of webHosts.entries()) {
+  if (platforms.platforms.some((platform) => platform.type === "web" && platform.hostname === hostname)) continue;
+  await project.createWebPlatform({ platformId: `cognora-web-${index + 1}`, name: hostname === "localhost" ? "Cognora local" : "Cognora production", hostname });
+  console.log(`Registered web platform: ${hostname}`);
+}
+
+console.log("Appwrite Phase 7 resources are ready.");

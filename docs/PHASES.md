@@ -56,10 +56,22 @@ Delivered with private in-app reminders, realtime AI job progress, completion/fa
 
 Delivered with an installable PWA shell, safe static-asset caching, `.ics` export, direct Google Calendar and Outlook event creation, opt-in content-free analytics, private beta feedback, founding-beta cohort preferences, and Appwrite full-text retrieval across material chunks for grounded coaching. The live Appwrite project has no messaging provider configured, so email delivery remains intentionally disabled and accurately labeled instead of simulating delivery.
 
-## Phase 7 — Launch and scale
+## Phase 7 — Launch and scale ✅
 
-- Configure a verified Appwrite email provider and production sender
-- Add two-way calendar OAuth sync and conflict handling
-- Introduce vector embeddings and hybrid semantic retrieval for very large libraries
-- Build a privacy-safe beta administration and release-health dashboard
-- Add custom domain, billing/entitlements, collaboration, and staged public launch controls
+- Production provider readiness and truthful activation states
+- Calendar conflict policy and two-way connection records
+- Optional vector embeddings with hybrid full-text and cosine retrieval
+- Privacy-safe launch administration and aggregate release health
+- Usage entitlements, collaboration roles, and staged release controls
+- Registered Appwrite web platforms for local and private production access
+
+Delivered with account-level AI, storage, and collaboration limits; live usage meters; staged release channels; course membership roles; calendar sync-state and conflict-policy records; optional OpenAI-compatible embeddings with full-text fallback; provider-ready email delivery; and an owner-claimable administration dashboard that exposes aggregate counts without learner content. Appwrite production and localhost origins are registered. External provider switches remain off because email, Google, Microsoft, Stripe, embedding, custom-domain credentials, and DNS are not configured.
+
+## Phase 8 — Provider activation and public launch
+
+- Connect and verify the Appwrite email sender
+- Supply Google and Microsoft OAuth credentials and activate two-way calendar sync
+- Choose an embedding provider and backfill existing material vectors
+- Connect Stripe plans, checkout, webhooks, and entitlement lifecycle updates
+- Add the production custom domain and complete DNS/SSL validation
+- Turn on collaboration invitations, conduct a security/load review, and stage the first public cohort

@@ -14,21 +14,21 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: "Cognora AI — Your learning, finally connected",
     description:
-      "An installable private AI learning workspace with adaptive planning, grounded guidance, calendar portability, and consent-first beta analytics.",
+      "A launch-controlled private AI learning workspace with adaptive planning, grounded guidance, usage entitlements, staged releases, and truthful integration readiness.",
     manifest: "/manifest.webmanifest",
     applicationName: "Cognora AI",
     themeColor: "#10233c",
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Cognora" },
     openGraph: {
       title: "Cognora AI",
-      description: "One private AI workspace to plan, learn, practice, and understand.",
+      description: "Private learning intelligence with controlled launch and scale.",
       type: "website",
       images: [{ url: `${origin}/og.png`, width: 1536, height: 1024, alt: "Cognora AI connected learning workspace" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Cognora AI",
-      description: "One private AI workspace to plan, learn, practice, and understand.",
+      description: "Private learning intelligence with controlled launch and scale.",
       images: [`${origin}/og.png`],
     },
   };

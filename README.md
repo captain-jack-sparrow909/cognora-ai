@@ -4,7 +4,7 @@ Cognora AI is a personal learning operating system that connects planning, lectu
 
 ## Current product state
 
-Phase 6 provides:
+Phase 7 provides:
 
 - Appwrite email/password authentication
 - private student profiles and onboarding preferences
@@ -30,8 +30,15 @@ Phase 6 provides:
 - opt-in, content-free product analytics and private founding-beta feedback
 - searchable material chunks and course-scoped Appwrite full-text retrieval for the AI coach
 - founding-beta cohort preferences and private feedback history
+- per-account AI, storage, and collaboration entitlements with live usage meters
+- staged private-beta, early-access, and general-release preferences
+- an owner-claimable, aggregate-only release-health dashboard
+- provider readiness for verified email, two-way calendars, embeddings, billing, and a custom domain
+- course membership roles and collaboration-seat foundations
+- optional OpenAI-compatible embeddings with full-text fallback and cosine reranking
+- registered Appwrite web origins for local and private production access
 
-Email reminder delivery is provider-ready but remains disabled until an Appwrite email provider and sender are connected.
+Email, calendar OAuth, vector embeddings, billing, and custom-domain activation are provider-ready but remain disabled until their external credentials and DNS are connected.
 
 ## Stack
 
@@ -47,7 +54,7 @@ Email reminder delivery is provider-ready but remains disabled until an Appwrite
 2. Install dependencies with `npm install`.
 3. Provision the Appwrite resources with `npm run appwrite:provision`.
 4. Deploy the learning function with `npm run appwrite:deploy-function`.
-5. Optionally validate the full temporary learning, intelligence, retrieval, beta, operations, and reminder loop with `npm run appwrite:smoke-learning`.
+5. Optionally validate the full temporary learning, intelligence, retrieval, beta, launch-administration, operations, and reminder loop with `npm run appwrite:smoke-learning`.
 6. Start the app with `npm run dev`.
 
 ## Validation

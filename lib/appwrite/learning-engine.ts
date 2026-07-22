@@ -13,9 +13,11 @@ type LearningAction =
   | { action: "detect_gaps"; courseId: string }
   | { action: "generate_roadmap"; courseId: string; goal: string }
   | { action: "ask_coach"; courseId?: string; message: string }
-  | { action: "sync_reminders" };
+  | { action: "sync_reminders" }
+  | { action: "get_launch_snapshot" }
+  | { action: "claim_launch_admin" };
 
-const jobLabels: Record<Exclude<LearningAction["action"], "submit_attempt" | "sync_reminders">, string> = {
+const jobLabels: Record<Exclude<LearningAction["action"], "submit_attempt" | "sync_reminders" | "get_launch_snapshot" | "claim_launch_admin">, string> = {
   process_material: "Analyzing course material",
   generate_plan: "Building an adaptive plan",
   review_assignment: "Reviewing an assignment",
@@ -37,7 +39,7 @@ function jobContext(action: LearningAction) {
 
 export async function executeLearningAction<T>(action: LearningAction): Promise<T> {
   const { account, client, functions, tables, config } = getAppwriteBrowserServices();
-  const runAsync = action.action !== "submit_attempt" && action.action !== "sync_reminders";
+  const runAsync = !["submit_attempt", "sync_reminders", "get_launch_snapshot", "claim_launch_admin"].includes(action.action);
   let jobId: string | undefined;
   let unsubscribe: (() => void) | undefined;
   let requestBody: LearningAction & { jobId?: string } = action;
@@ -53,7 +55,7 @@ export async function executeLearningAction<T>(action: LearningAction): Promise<
         ownerId: user.$id,
         ...jobContext(action),
         action: action.action,
-        label: jobLabels[action.action],
+        label: jobLabels[action.action as keyof typeof jobLabels],
         status: "queued",
         progress: 2,
         stage: "Queued securely",

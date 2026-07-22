@@ -23,6 +23,7 @@ import { executeLearningAction } from "@/lib/appwrite/learning-engine";
 import type { AiJob, LearnerNotification, ReminderPreferences } from "@/lib/appwrite/models";
 import { privateUserPermissions } from "@/lib/appwrite/permissions";
 import { BetaGrowthWorkspace } from "@/components/operations/beta-growth-workspace";
+import { LaunchScaleWorkspace } from "@/components/operations/launch-scale-workspace";
 
 function relativeTime(value: string) {
   const delta = Date.now() - new Date(value).getTime();
@@ -107,6 +108,7 @@ export function ActivityCenter({ userId, onOpenSettings }: { userId: string; onO
 }
 
 export function SettingsWorkspace({ userId, timezone }: { userId: string; timezone: string }) {
+  const emailReady = process.env.NEXT_PUBLIC_APPWRITE_EMAIL_READY === "true";
   const [preferences, setPreferences] = useState<ReminderPreferences | null>(null);
   const [jobs, setJobs] = useState<AiJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +143,7 @@ export function SettingsWorkspace({ userId, timezone }: { userId: string; timezo
         data: {
           ownerId: userId,
           inAppEnabled: form.get("inAppEnabled") === "on",
-          emailEnabled: false,
+          emailEnabled: emailReady && form.get("emailEnabled") === "on",
           dailyTime: String(form.get("dailyTime") || "18:00"),
           daysJson: JSON.stringify(form.getAll("days")),
           timezone,
@@ -174,7 +176,7 @@ export function SettingsWorkspace({ userId, timezone }: { userId: string; timezo
       <form className="settings-panel reminder-settings" onSubmit={save}>
         <header><span><BellRing size={19} /></span><div><p className="card-kicker">Study reminders</p><h2>In-app schedule</h2></div></header>
         <label className="toggle-row"><span><strong>In-app reminders</strong><small>Show planned sessions and completed AI work in Cognora.</small></span><input name="inAppEnabled" type="checkbox" defaultChecked={preferences?.inAppEnabled ?? true} /></label>
-        <label className="toggle-row disabled"><span><strong>Email reminders</strong><small>Ready to enable after an Appwrite email provider and sender are connected.</small></span><Mail size={17} /><input name="emailEnabled" type="checkbox" disabled /></label>
+        <label className={`toggle-row ${emailReady ? "" : "disabled"}`}><span><strong>Email reminders</strong><small>{emailReady ? "Send study reminders through the verified Appwrite email provider." : "Ready to enable after an Appwrite email provider and sender are connected."}</small></span>{!emailReady && <Mail size={17} />}<input name="emailEnabled" type="checkbox" defaultChecked={emailReady && preferences?.emailEnabled} disabled={!emailReady} /></label>
         <div className="settings-two-col"><label>Daily digest time<input name="dailyTime" type="time" defaultValue={preferences?.dailyTime || "18:00"} /></label><label>Task reminder<select name="taskLeadMinutes" defaultValue={String(preferences?.taskLeadMinutes || 30)}><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label></div>
         <fieldset><legend>Study days</legend><div className="day-picker">{[["mon","M"],["tue","T"],["wed","W"],["thu","T"],["fri","F"],["sat","S"],["sun","S"]].map(([value,label]) => <label key={value}><input name="days" type="checkbox" value={value} defaultChecked={days.includes(value)} /><span>{label}</span></label>)}</div></fieldset>
         <div className="settings-two-col"><label>Quiet hours start<input name="quietStart" type="time" defaultValue={preferences?.quietStart || "22:00"} /></label><label>Quiet hours end<input name="quietEnd" type="time" defaultValue={preferences?.quietEnd || "07:00"} /></label></div>
@@ -187,6 +189,6 @@ export function SettingsWorkspace({ userId, timezone }: { userId: string; timezo
         <p className="operations-note"><ShieldCheck size={15} />Operational records contain status, duration, model, and token totals—not submission text or AI responses. The daily request guardrail is enforced server-side.</p>
         {failed.length > 0 && <p className="failure-note"><TriangleAlert size={14} />{failed.length} recent {failed.length === 1 ? "job needs" : "jobs need"} attention. Existing learning data remains intact.</p>}
       </section>
-    </div><BetaGrowthWorkspace userId={userId} /></>}
+    </div><BetaGrowthWorkspace userId={userId} /><LaunchScaleWorkspace userId={userId} /></>}
   </div>;
 }

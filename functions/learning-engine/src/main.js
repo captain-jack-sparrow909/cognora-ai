@@ -1,4 +1,4 @@
-import { Client, ID, Permission, Query, Role, Storage, TablesDB } from "node-appwrite";
+import { Client, ID, Messaging, Permission, Query, Role, Storage, TablesDB, Users } from "node-appwrite";
 import { OfficeParser } from "officeparser";
 
 const MAX_SOURCE_CHARS = 60_000;
@@ -87,6 +87,8 @@ function createUserServices(req) {
   if (!endpoint || !projectId) throw new Error("Appwrite function configuration is incomplete.");
 
   const client = new Client().setEndpoint(endpoint).setProject(projectId).setJWT(jwt);
+  const functionKey = process.env.APPWRITE_FUNCTION_API_KEY || process.env.APPWRITE_ADMIN_API_KEY;
+  const adminClient = functionKey ? new Client().setEndpoint(endpoint).setProject(projectId).setKey(functionKey) : null;
   return {
     userId,
     tables: new TablesDB(client),
@@ -94,7 +96,34 @@ function createUserServices(req) {
     databaseId: process.env.APPWRITE_DATABASE_ID,
     bucketId: process.env.APPWRITE_MATERIALS_BUCKET_ID,
     submissionsBucketId: process.env.APPWRITE_SUBMISSIONS_BUCKET_ID || "submissions",
+    admin: adminClient ? { tables: new TablesDB(adminClient), users: new Users(adminClient), messaging: new Messaging(adminClient) } : null,
   };
+}
+
+async function embedTexts(inputs) {
+  const key = process.env.EMBEDDING_API_KEY;
+  const base = process.env.EMBEDDING_BASE_URL;
+  const model = process.env.EMBEDDING_MODEL;
+  if (!key || !base || !model || inputs.length === 0) return [];
+  const response = await fetch(`${base.replace(/\/$/, "")}/embeddings`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, input: inputs }),
+  });
+  if (!response.ok) throw new Error(`Embedding request failed (${response.status}).`);
+  const payload = await response.json();
+  return (payload.data || []).sort((a, b) => a.index - b.index).map((item) => Array.isArray(item.embedding) ? item.embedding : []);
+}
+
+function cosineSimilarity(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length || left.length === 0) return 0;
+  let dot = 0; let leftNorm = 0; let rightNorm = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    dot += left[index] * right[index];
+    leftNorm += left[index] ** 2;
+    rightNorm += right[index] ** 2;
+  }
+  return leftNorm && rightNorm ? dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm)) : 0;
 }
 
 async function extractText(buffer, filename, mimeType) {
@@ -198,6 +227,18 @@ async function syncReminders(services) {
       entityId: task.$id,
       scheduledFor: scheduledFor > now ? scheduledFor.toISOString() : now.toISOString(),
     });
+    if (preference.emailEnabled && process.env.APPWRITE_EMAIL_READY === "true" && services.admin?.messaging) {
+      const emailAt = scheduledFor.getTime() > Date.now() + 60_000 ? scheduledFor.toISOString() : undefined;
+      await services.admin.messaging.createEmail({
+        messageId: ID.unique(),
+        subject: `Upcoming study session: ${task.title}`.slice(0, 998),
+        content: `${task.durationMinutes} minute Cognora study session. ${task.reason || "Part of your adaptive study plan."}`.slice(0, 20_000),
+        users: [userId],
+        draft: false,
+        html: false,
+        scheduledAt: emailAt,
+      }).catch(() => undefined);
+    }
     created += 1;
   }
   return { ok: true, created };
@@ -238,6 +279,7 @@ async function processMaterial(services, body) {
     const now = new Date().toISOString();
     const permissions = userPermissions(userId);
     const chunks = chunkSource(source);
+    const chunkEmbeddings = await embedTexts(chunks).catch(() => []);
     await Promise.all([
       deleteRows(tables, databaseId, "material_insights", [Query.equal("materialId", [materialId])]),
       deleteRows(tables, databaseId, "practice_items", [Query.equal("materialId", [materialId])]),
@@ -275,11 +317,21 @@ async function processMaterial(services, body) {
     });
 
     for (const [chunkIndex, content] of chunks.entries()) {
+      const embedding = chunkEmbeddings[chunkIndex];
       await tables.createRow({
         databaseId,
         tableId: "knowledge_chunks",
         rowId: ID.unique(),
-        data: { ownerId: userId, courseId: material.courseId, materialId, chunkIndex, content, createdAt: now },
+        data: {
+          ownerId: userId,
+          courseId: material.courseId,
+          materialId,
+          chunkIndex,
+          content,
+          embeddingJson: embedding?.length ? JSON.stringify(embedding) : undefined,
+          embeddingModel: embedding?.length ? process.env.EMBEDDING_MODEL.slice(0, 96) : undefined,
+          createdAt: now,
+        },
         permissions,
       });
     }
@@ -727,12 +779,29 @@ async function askCoach(services, body) {
   }
   const courseQueries = courseId ? [Query.equal("courseId", [courseId])] : [Query.equal("ownerId", [userId])];
   const knowledgePromise = (async () => {
+    let lexicalRows = [];
     try {
       const searched = await tables.listRows({ databaseId, tableId: "knowledge_chunks", queries: [...courseQueries, Query.search("content", message), Query.limit(8)] });
-      if (searched.rows.length) return searched;
+      lexicalRows = searched.rows;
     } catch {
       // Full-text search can be temporarily unavailable while a new index is building.
     }
+    const queryEmbedding = (await embedTexts([message]).catch(() => []))[0];
+    let semanticRows = [];
+    if (queryEmbedding?.length) {
+      const candidates = await tables.listRows({ databaseId, tableId: "knowledge_chunks", queries: [...courseQueries, Query.orderDesc("createdAt"), Query.limit(100)] });
+      semanticRows = candidates.rows
+        .map((chunk) => {
+          try { return { chunk, score: cosineSimilarity(queryEmbedding, JSON.parse(chunk.embeddingJson || "[]")) }; }
+          catch { return { chunk, score: 0 }; }
+        })
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 8)
+        .map((candidate) => candidate.chunk);
+    }
+    const merged = [...lexicalRows, ...semanticRows].filter((chunk, index, rows) => rows.findIndex((candidate) => candidate.$id === chunk.$id) === index).slice(0, 10);
+    if (merged.length) return { rows: merged };
     return tables.listRows({ databaseId, tableId: "knowledge_chunks", queries: [...courseQueries, Query.orderDesc("createdAt"), Query.limit(6)] });
   })();
   const [profiles, concepts, gaps, tasks, insights, roadmaps, knowledge] = await Promise.all([
@@ -778,6 +847,64 @@ async function askCoach(services, body) {
   };
 }
 
+function integrationReadiness() {
+  return {
+    appwriteWeb: process.env.APPWRITE_WEB_READY !== "false",
+    email: process.env.APPWRITE_EMAIL_READY === "true",
+    googleCalendar: process.env.GOOGLE_CALENDAR_READY === "true",
+    microsoftCalendar: process.env.MICROSOFT_CALENDAR_READY === "true",
+    embeddings: Boolean(process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL),
+    billing: process.env.STRIPE_READY === "true",
+    customDomain: process.env.CUSTOM_DOMAIN_READY === "true",
+  };
+}
+
+async function getLaunchSnapshot(services) {
+  const { tables, databaseId, userId, admin } = services;
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const [jobs, materials, submissions, courses, members] = await Promise.all([
+    tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.equal("ownerId", [userId]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(100)] }),
+    tables.listRows({ databaseId, tableId: "materials", queries: [Query.equal("ownerId", [userId]), Query.limit(100)] }),
+    tables.listRows({ databaseId, tableId: "submissions", queries: [Query.equal("ownerId", [userId]), Query.limit(100)] }),
+    tables.listRows({ databaseId, tableId: "courses", queries: [Query.equal("ownerId", [userId]), Query.limit(1)] }),
+    tables.listRows({ databaseId, tableId: "course_members", queries: [Query.equal("ownerId", [userId]), Query.equal("status", ["active"]), Query.limit(1)] }),
+  ]);
+  const personal = {
+    aiJobsToday: jobs.rows.length,
+    storageBytes: [...materials.rows, ...submissions.rows].reduce((total, row) => total + Number(row.size || 0), 0),
+    courses: courses.total,
+    collaborators: members.total,
+  };
+  if (!admin) return { ok: true, isAdmin: false, canClaimAdmin: false, integrations: integrationReadiness(), personal };
+  const admins = await admin.tables.listRows({ databaseId, tableId: "launch_admins", queries: [Query.limit(10)] });
+  const isAdmin = admins.rows.some((row) => row.userId === userId);
+  const snapshot = { ok: true, isAdmin, canClaimAdmin: admins.rows.length === 0, integrations: integrationReadiness(), personal };
+  if (!isAdmin) return snapshot;
+  const [accounts, feedback, platformJobs, failedJobs] = await Promise.all([
+    admin.users.list({ queries: [Query.limit(1)] }),
+    admin.tables.listRows({ databaseId, tableId: "product_feedback", queries: [Query.limit(1)] }),
+    admin.tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
+    admin.tables.listRows({ databaseId, tableId: "ai_jobs", queries: [Query.equal("status", ["failed"]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(1)] }),
+  ]);
+  return { ...snapshot, platform: { accounts: accounts.total, feedback: feedback.total, aiJobsToday: platformJobs.total, failedJobsToday: failedJobs.total } };
+}
+
+async function claimLaunchAdmin(services) {
+  if (!services.admin) throw new Error("Launch administration is unavailable until the function key is configured.");
+  const existing = await services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "launch_admins", queries: [Query.limit(1)] });
+  if (existing.rows.length === 0) {
+    await services.admin.tables.createRow({
+      databaseId: services.databaseId,
+      tableId: "launch_admins",
+      rowId: "primary",
+      data: { userId: services.userId, role: "owner", claimedAt: new Date().toISOString() },
+      permissions: [Permission.read(Role.user(services.userId))],
+    }).catch((caught) => { if (caught?.code !== 409) throw caught; });
+  }
+  return getLaunchSnapshot(services);
+}
+
 async function prepareJob(services, body) {
   const jobId = text(body.jobId);
   if (!jobId) return;
@@ -791,7 +918,13 @@ async function prepareJob(services, body) {
     queries: [Query.equal("ownerId", [services.userId]), Query.greaterThanEqual("createdAt", [startOfDay.toISOString()]), Query.limit(100)],
     total: false,
   });
-  const limit = clamp(process.env.AI_DAILY_REQUEST_LIMIT || 40, 1, 1000);
+  const entitlementRows = await services.tables.listRows({
+    databaseId: services.databaseId,
+    tableId: "entitlements",
+    queries: [Query.equal("ownerId", [services.userId]), Query.limit(1)],
+    total: false,
+  }).catch(() => ({ rows: [] }));
+  const limit = clamp(entitlementRows.rows[0]?.aiDailyLimit || process.env.AI_DAILY_REQUEST_LIMIT || 40, 1, 10000);
   if (recent.rows.length > limit) {
     await services.tables.updateRow({ databaseId: services.databaseId, tableId: "ai_jobs", rowId: jobId, data: { status: "failed", progress: 100, stage: "Daily limit reached", error: `Daily AI request limit reached (${limit}).`, completedAt: new Date().toISOString() } });
     throw new Error(`Daily AI request limit reached (${limit}). Try again tomorrow.`);
@@ -881,6 +1014,8 @@ async function main({ req, res, log, error }) {
     else if (body.action === "generate_roadmap") result = await generateRoadmap(services, body);
     else if (body.action === "ask_coach") result = await askCoach(services, body);
     else if (body.action === "sync_reminders") result = await syncReminders(services);
+    else if (body.action === "get_launch_snapshot") result = await getLaunchSnapshot(services);
+    else if (body.action === "claim_launch_admin") result = await claimLaunchAdmin(services);
     else throw new Error("Unknown learning engine action.");
     if (body.action === "generate_plan") await syncReminders(services).catch(() => undefined);
     await completeJob(services);

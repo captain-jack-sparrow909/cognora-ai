@@ -101,9 +101,9 @@ try {
   const password = `Cg!${randomBytes(18).toString("base64url")}`;
   await users.create({
     userId: created.userId,
-    email: `phase6-smoke-${Date.now()}@example.test`,
+    email: `phase7-smoke-${Date.now()}@example.test`,
     password,
-    name: "Phase 6 smoke test",
+    name: "Phase 7 smoke test",
   });
   const session = await users.createSession({ userId: created.userId });
   const jwt = await users.createJWT({ userId: created.userId, sessionId: session.$id, duration: 900 });
@@ -136,7 +136,7 @@ try {
       code: "BIO-SMOKE",
       color: "teal",
       term: "Validation",
-      description: "Temporary Phase 6 beta-loop validation.",
+      description: "Temporary Phase 7 launch-loop validation.",
       targetGrade: "A",
       status: "active",
       createdAt: now,
@@ -150,7 +150,7 @@ try {
     rowId: ID.unique(),
     data: {
       ownerId: created.userId,
-      displayName: "Phase 6 smoke test",
+      displayName: "Phase 7 smoke test",
       studyLevel: "undergraduate",
       timezone: "Asia/Dubai",
       weeklyHours: 5,
@@ -211,12 +211,16 @@ try {
     databaseId,
     tableId: "beta_profiles",
     rowId: created.userId,
-    data: { ownerId: created.userId, cohort: "phase6-validation", analyticsEnabled: true, joinedAt: now, updatedAt: now },
+    data: { ownerId: created.userId, cohort: "phase7-validation", analyticsEnabled: true, joinedAt: now, updatedAt: now },
     permissions,
   });
   await Promise.all([
     tables.createRow({ databaseId, tableId: "analytics_events", rowId: ID.unique(), data: { ownerId: created.userId, eventName: "view_opened", view: "settings", sessionId: ID.unique(), metadataJson: "{}", createdAt: now }, permissions }),
     tables.createRow({ databaseId, tableId: "product_feedback", rowId: ID.unique(), data: { ownerId: created.userId, category: "delight", rating: 5, message: "Phase 6 validation feedback.", status: "new", createdAt: now }, permissions }),
+    tables.createRow({ databaseId, tableId: "entitlements", rowId: created.userId, data: { ownerId: created.userId, plan: "founding-beta", status: "active", aiDailyLimit: 40, storageLimitMb: 1024, collaborationSeats: 3, updatedAt: now }, permissions }),
+    tables.createRow({ databaseId, tableId: "launch_preferences", rowId: created.userId, data: { ownerId: created.userId, releaseChannel: "private-beta", autoUpdates: true, providerAlerts: true, updatedAt: now }, permissions }),
+    tables.createRow({ databaseId, tableId: "calendar_connections", rowId: `${created.userId}-google`, data: { ownerId: created.userId, provider: "google", status: "not-configured", syncMode: "two-way", conflictPolicy: "ask", updatedAt: now }, permissions }),
+    tables.createRow({ databaseId, tableId: "course_members", rowId: ID.unique(), data: { ownerId: created.userId, courseId: created.courseId, memberId: created.userId, role: "owner", status: "active", joinedAt: now }, permissions }),
   ]);
 
   await runAction(functions, ExecutionMethod, { action: "process_material", materialId: created.materialId }, true, async () => {
@@ -300,8 +304,9 @@ try {
     const rows = await tables.listRows({ databaseId, tableId: "coach_messages", queries: [Query.equal("courseId", [created.courseId])] });
     return rows.rows.length > 0;
   }, operationContext);
+  const launchSnapshot = await runAction(functions, ExecutionMethod, { action: "claim_launch_admin" }, false);
 
-  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback] = await Promise.all([
+  const [reports, gapRows, roadmaps, roadmapSteps, coachMessages, aiJobs, notifications, betaProfiles, analyticsEvents, productFeedback, entitlements, launchPreferences, calendarConnections, courseMembers] = await Promise.all([
     tables.listRows({ databaseId, tableId: "feedback_reports", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "gap_insights", queries: [Query.equal("courseId", [created.courseId])] }),
     tables.listRows({ databaseId, tableId: "roadmaps", queries: [Query.equal("courseId", [created.courseId])] }),
@@ -312,6 +317,10 @@ try {
     tables.listRows({ databaseId, tableId: "beta_profiles", queries: [Query.equal("ownerId", [created.userId])] }),
     tables.listRows({ databaseId, tableId: "analytics_events", queries: [Query.equal("ownerId", [created.userId])] }),
     tables.listRows({ databaseId, tableId: "product_feedback", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "entitlements", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "launch_preferences", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "calendar_connections", queries: [Query.equal("ownerId", [created.userId])] }),
+    tables.listRows({ databaseId, tableId: "course_members", queries: [Query.equal("ownerId", [created.userId])] }),
   ]);
   if (!reports.rows.length || !gapRows.rows.length || !roadmaps.rows.length || !roadmapSteps.rows.length || !coachMessages.rows.length) {
     throw new Error("The Phase 4 function actions completed without persisting the full intelligence loop.");
@@ -319,6 +328,7 @@ try {
   if (aiJobs.rows.length !== 6 || aiJobs.rows.some((job) => job.status !== "completed" || job.progress !== 100 || !job.durationMs || !job.model)) throw new Error("Phase 5 AI job observability did not record complete operational metadata.");
   if (!notifications.rows.some((notification) => notification.type === "ai-complete") || !notifications.rows.some((notification) => notification.type === "reminder")) throw new Error("Phase 5 notifications did not include both AI completion and study reminders.");
   if (!betaProfiles.rows[0]?.analyticsEnabled || !analyticsEvents.rows.length || !productFeedback.rows.length) throw new Error("Phase 6 beta consent, analytics, and feedback records were not persisted.");
+  if (!entitlements.rows.length || !launchPreferences.rows.length || !calendarConnections.rows.length || !courseMembers.rows.length || !launchSnapshot.isAdmin || !launchSnapshot.integrations?.appwriteWeb) throw new Error("Phase 7 launch controls, entitlements, collaboration, and administration were not persisted.");
   console.log(JSON.stringify({
     function: functionId,
     materialStatus: "ready",
@@ -340,11 +350,17 @@ try {
     betaCohort: betaProfiles.rows[0].cohort,
     analyticsEvents: analyticsEvents.rows.length,
     productFeedback: productFeedback.rows.length,
+    launchAdmin: launchSnapshot.isAdmin,
+    releaseChannel: launchPreferences.rows[0].releaseChannel,
+    aiDailyEntitlement: entitlements.rows[0].aiDailyLimit,
+    collaborationSeats: entitlements.rows[0].collaborationSeats,
+    providerReadyCount: Object.values(launchSnapshot.integrations).filter(Boolean).length,
   }, null, 2));
 } finally {
   if (created.courseId) {
-    for (const tableId of ["product_feedback", "analytics_events", "beta_profiles", "knowledge_chunks", "notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
-      const ownerScoped = ["product_feedback", "analytics_events", "beta_profiles", "notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
+    await adminTables.deleteRow({ databaseId, tableId: "launch_admins", rowId: "primary" }).catch(() => undefined);
+    for (const tableId of ["course_members", "calendar_connections", "launch_preferences", "entitlements", "product_feedback", "analytics_events", "beta_profiles", "knowledge_chunks", "notifications", "ai_jobs", "reminder_preferences", "coach_messages", "roadmap_steps", "roadmaps", "gap_insights", "feedback_reports", "submissions", "assignments", "practice_attempts", "mastery_records", "practice_items", "study_tasks", "concepts", "material_insights", "materials", "profiles"]) {
+      const ownerScoped = ["course_members", "calendar_connections", "launch_preferences", "entitlements", "product_feedback", "analytics_events", "beta_profiles", "notifications", "ai_jobs", "reminder_preferences", "profiles"].includes(tableId);
       const actualField = ownerScoped ? "ownerId" : "courseId";
       const value = ownerScoped ? created.userId : created.courseId;
       await deleteMatching(tableId, [Query.equal(actualField, [value])]).catch(() => undefined);

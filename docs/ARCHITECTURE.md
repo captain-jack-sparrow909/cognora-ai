@@ -58,6 +58,14 @@
 - `analytics_events`: private allowlisted product events without course or AI content
 - `product_feedback`: private beta ratings, categories, messages, and triage state
 
+### Phase 7 tables — provisioned
+
+- `entitlements`: private plan, AI-request, storage, and collaboration-seat limits
+- `launch_preferences`: private staged-release channel and provider-alert settings
+- `calendar_connections`: provider status, sync mode, conflict policy, and last-sync state
+- `course_members`: owner, editor, and viewer membership foundations per course
+- `launch_admins`: server-created launch owner/operator roles with no browser create access
+
 ### Planned tables
 
 `course_members`, `lectures`, `concept_relationships`, `study_sessions`, and `assessments`.
@@ -80,6 +88,8 @@
 - `ask-coach`: implemented as the `ask_coach` action grounded in profile, course, concepts, gaps, plan, full-text-retrieved source chunks, materials, and roadmap
 - `update-mastery`: implemented as the `submit_attempt` action
 - `sync-reminders`: implemented as the `sync_reminders` action, translating planned tasks into private scheduled in-app notifications
+- `get-launch-snapshot`: implemented as the `get_launch_snapshot` action, returning personal usage plus aggregate-only platform health for launch administrators
+- `claim-launch-admin`: implemented as the `claim_launch_admin` action with a first-owner bootstrap and fixed unique record
 - `deepseek-gateway`: the learning engine owns normalized JSON model access, one bounded retry for transient failures, token accounting, structured operational logs, and a configurable daily request limit
 
 Long-running AI actions create a user-owned `ai_jobs` row before execution. The browser subscribes to that exact row with Appwrite Realtime and retains a polling fallback. The function advances the job through queued, processing, reasoning, persistence, completed, or failed states, then emits a private notification. Operational records exclude prompt, submission, and response content.
@@ -90,4 +100,8 @@ In-app reminders and activity are live. Email delivery remains off until an Appw
 
 ## Retrieval approach
 
-Phase 6 uses course-scoped text chunks and Appwrite full-text search with a recent-source fallback. Hybrid semantic vector search can be added later through an external vector store connected by an Appwrite Function, while Appwrite remains the system of record.
+Phase 7 keeps Appwrite full-text search as the always-available retrieval path and optionally calls an OpenAI-compatible embedding endpoint. When embeddings are configured, chunk vectors are stored privately and query-time cosine similarity reranks up to 100 recent course chunks before merging them with lexical matches. Without an embedding provider, the system falls back to full-text and recent-source retrieval without overstating semantic capability.
+
+### Launch provider boundary
+
+Appwrite web origins are live. Email, Google Calendar, Microsoft Calendar, embeddings, Stripe, and custom-domain switches default to false and are surfaced as setup-required. Enabling a switch requires the corresponding provider credentials or validated DNS; the interface never treats a stored preference as proof that an external integration is connected.

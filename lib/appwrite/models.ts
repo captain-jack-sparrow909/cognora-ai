@@ -255,6 +255,8 @@ export type KnowledgeChunk = Models.Row & {
   materialId: string;
   chunkIndex: number;
   content: string;
+  embeddingJson?: string;
+  embeddingModel?: string;
   createdAt: string;
 };
 
@@ -282,4 +284,69 @@ export type ProductFeedback = Models.Row & {
   message: string;
   status: "new" | "reviewed" | "planned" | "resolved";
   createdAt: string;
+};
+
+export type Entitlement = Models.Row & {
+  ownerId: string;
+  plan: "founding-beta" | "pro" | "education";
+  status: "active" | "trialing" | "paused";
+  aiDailyLimit: number;
+  storageLimitMb: number;
+  collaborationSeats: number;
+  trialEndsAt?: string;
+  updatedAt: string;
+};
+
+export type LaunchPreferences = Models.Row & {
+  ownerId: string;
+  releaseChannel: "private-beta" | "early-access" | "general";
+  autoUpdates: boolean;
+  providerAlerts: boolean;
+  updatedAt: string;
+};
+
+export type CalendarConnection = Models.Row & {
+  ownerId: string;
+  provider: "google" | "microsoft";
+  status: "not-configured" | "connected" | "paused" | "error";
+  syncMode: "export" | "import" | "two-way";
+  conflictPolicy: "ask" | "cognora-wins" | "calendar-wins";
+  lastSyncAt?: string;
+  updatedAt: string;
+};
+
+export type CourseMember = Models.Row & {
+  ownerId: string;
+  courseId: string;
+  memberId: string;
+  role: "owner" | "editor" | "viewer";
+  status: "active" | "invited" | "revoked";
+  joinedAt: string;
+};
+
+export type LaunchSnapshot = {
+  ok: boolean;
+  isAdmin: boolean;
+  canClaimAdmin: boolean;
+  integrations: {
+    appwriteWeb: boolean;
+    email: boolean;
+    googleCalendar: boolean;
+    microsoftCalendar: boolean;
+    embeddings: boolean;
+    billing: boolean;
+    customDomain: boolean;
+  };
+  personal: {
+    aiJobsToday: number;
+    storageBytes: number;
+    courses: number;
+    collaborators: number;
+  };
+  platform?: {
+    accounts: number;
+    feedback: number;
+    aiJobsToday: number;
+    failedJobsToday: number;
+  };
 };

@@ -48,7 +48,7 @@ const settings = {
   logging: true,
   entrypoint: "src/main.js",
   commands: "npm install",
-  scopes: [ProjectKeyScopes.RowsRead, ProjectKeyScopes.RowsWrite, ProjectKeyScopes.FilesRead],
+  scopes: [ProjectKeyScopes.RowsRead, ProjectKeyScopes.RowsWrite, ProjectKeyScopes.FilesRead, ProjectKeyScopes.UsersRead, ProjectKeyScopes.MessagesWrite],
 };
 
 if (current) {
@@ -61,6 +61,7 @@ if (current) {
 
 const variables = [
   ["appwrite_endpoint", "APPWRITE_ENDPOINT", process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT, false],
+  ["appwrite_admin_key", "APPWRITE_ADMIN_API_KEY", process.env.APPWRITE_API_KEY, true],
   ["database_id", "APPWRITE_DATABASE_ID", process.env.APPWRITE_DATABASE_ID, false],
   ["materials_bucket", "APPWRITE_MATERIALS_BUCKET_ID", process.env.APPWRITE_MATERIALS_BUCKET_ID, false],
   ["submissions_bucket", "APPWRITE_SUBMISSIONS_BUCKET_ID", process.env.APPWRITE_SUBMISSIONS_BUCKET_ID, false],
@@ -69,7 +70,20 @@ const variables = [
   ["deepseek_fast", "DEEPSEEK_FAST_MODEL", process.env.DEEPSEEK_FAST_MODEL, false],
   ["deepseek_reasoning", "DEEPSEEK_REASONING_MODEL", process.env.DEEPSEEK_REASONING_MODEL, false],
   ["ai_daily_limit", "AI_DAILY_REQUEST_LIMIT", process.env.AI_DAILY_REQUEST_LIMIT, false],
+  ["web_ready", "APPWRITE_WEB_READY", process.env.APPWRITE_WEB_READY || "true", false],
+  ["email_ready", "APPWRITE_EMAIL_READY", process.env.APPWRITE_EMAIL_READY || "false", false],
+  ["google_calendar_ready", "GOOGLE_CALENDAR_READY", process.env.GOOGLE_CALENDAR_READY || "false", false],
+  ["microsoft_calendar_ready", "MICROSOFT_CALENDAR_READY", process.env.MICROSOFT_CALENDAR_READY || "false", false],
+  ["stripe_ready", "STRIPE_READY", process.env.STRIPE_READY || "false", false],
+  ["custom_domain_ready", "CUSTOM_DOMAIN_READY", process.env.CUSTOM_DOMAIN_READY || "false", false],
 ];
+if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL) {
+  variables.push(
+    ["embedding_key", "EMBEDDING_API_KEY", process.env.EMBEDDING_API_KEY, true],
+    ["embedding_base", "EMBEDDING_BASE_URL", process.env.EMBEDDING_BASE_URL, false],
+    ["embedding_model", "EMBEDDING_MODEL", process.env.EMBEDDING_MODEL, false],
+  );
+}
 const existing = await functions.listVariables({ functionId, total: false });
 for (const [variableId, key, value, secret] of variables) {
   const match = existing.variables.find((variable) => variable.key === key);

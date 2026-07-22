@@ -493,7 +493,7 @@ export default function Home() {
           </section>
 
           <footer className="product-footer">
-            <span>Phase 6 · Founding beta ready</span>
+            <span>Phase 7 · Launch controlled</span>
             <span>Plan → Learn → Practice → Understand</span>
           </footer>
         </div>
