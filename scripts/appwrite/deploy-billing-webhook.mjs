@@ -21,6 +21,7 @@ try { current = await functions.get({ functionId }); } catch (caught) { if (caug
 if (current) await functions.update(settings); else await functions.create(settings);
 
 const variables = [
+  ["billing_appwrite_admin_key", "APPWRITE_ADMIN_API_KEY", process.env.APPWRITE_API_KEY, true],
   ["billing_database_id", "APPWRITE_DATABASE_ID", process.env.APPWRITE_DATABASE_ID, false],
   ["billing_stripe_secret", "STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY, true],
   ["billing_stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET, true],

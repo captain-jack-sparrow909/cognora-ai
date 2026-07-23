@@ -44,7 +44,9 @@ export default async function main({ req, res, error }) {
 
     const [stateId, secret] = state.split(".", 2);
     const endpoint = process.env.APPWRITE_ENDPOINT || process.env.APPWRITE_FUNCTION_API_ENDPOINT;
-    const client = new Client().setEndpoint(endpoint).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(process.env.APPWRITE_FUNCTION_API_KEY);
+    const serverKey = process.env.APPWRITE_ADMIN_API_KEY || process.env.APPWRITE_FUNCTION_API_KEY;
+    if (!serverKey) return redirect(res, "configuration");
+    const client = new Client().setEndpoint(endpoint).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(serverKey);
     const tables = new TablesDB(client);
     const databaseId = process.env.APPWRITE_DATABASE_ID;
     const savedState = await tables.getRow({ databaseId, tableId: "calendar_oauth_states", rowId: stateId });

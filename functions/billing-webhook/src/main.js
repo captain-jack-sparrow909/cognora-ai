@@ -84,7 +84,9 @@ export default async function main({ req, res, error }) {
     if (!signingSecrets.some((secret) => verifyStripeSignature(rawBody, header(req.headers, "stripe-signature"), secret))) return res.json({ ok: false, error: "Invalid webhook signature." }, 401);
     const event = JSON.parse(rawBody);
     const endpoint = process.env.APPWRITE_ENDPOINT || process.env.APPWRITE_FUNCTION_API_ENDPOINT;
-    const client = new Client().setEndpoint(endpoint).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(process.env.APPWRITE_FUNCTION_API_KEY);
+    const serverKey = process.env.APPWRITE_ADMIN_API_KEY || process.env.APPWRITE_FUNCTION_API_KEY;
+    if (!serverKey) return res.json({ ok: false, error: "Billing storage access is not configured." }, 503);
+    const client = new Client().setEndpoint(endpoint).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(serverKey);
     const tables = new TablesDB(client);
     const databaseId = process.env.APPWRITE_DATABASE_ID;
     const existing = await tables.listRows({ databaseId, tableId: "billing_events", queries: [Query.equal("eventId", [String(event.id)]), Query.limit(1)] });
