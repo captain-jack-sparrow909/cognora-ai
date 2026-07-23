@@ -69,9 +69,9 @@ export default function MarketingHome() {
       <a className="skip-link" href="#main-content">Skip to main content</a>
 
       <header className="marketing-header">
-        <Link className="marketing-brand" href="/" aria-label="Cognora AI home">
+        <Link className="marketing-brand" href="/" aria-label="CognoraAI home">
           <CognoraLogo size={44} />
-          <span><strong>Cognora</strong><small>Learning intelligence</small></span>
+          <span><strong>CognoraAI</strong><small>Learning intelligence</small></span>
         </Link>
         <nav aria-label="Primary">
           <a href="#features">Features</a>
@@ -91,7 +91,7 @@ export default function MarketingHome() {
           <p className="marketing-pill"><Sparkles size={14} /> One connected AI learning workspace</p>
           <h1>Turn every course into a plan you can actually follow.</h1>
           <p className="marketing-hero-lead">
-            Cognora brings study planning, lecture understanding, learning roadmaps, assignment
+            CognoraAI brings study planning, lecture understanding, learning roadmaps, assignment
             feedback, and knowledge-gap detection into one private platform—so every study session
             has a clear purpose.
           </p>
@@ -108,7 +108,7 @@ export default function MarketingHome() {
           </div>
         </div>
 
-        <div className="marketing-product-preview" aria-label="Preview of the Cognora learning workspace">
+        <div className="marketing-product-preview" aria-label="Preview of the CognoraAI learning workspace">
           <div className="preview-glow" />
           <div className="preview-window">
             <header>
@@ -155,7 +155,7 @@ export default function MarketingHome() {
           <p>Five core learning systems</p>
           <h2>One platform that understands the whole learning journey.</h2>
           <span>
-            Instead of isolated AI tools, Cognora connects what you study, what you need to do, how
+            Instead of isolated AI tools, CognoraAI connects what you study, what you need to do, how
             you perform, and what should happen next.
           </span>
         </div>
@@ -186,14 +186,14 @@ export default function MarketingHome() {
           <p>From material to mastery</p>
           <h2>A clear loop for learning better.</h2>
           <span>
-            Cognora turns scattered course information into an explainable system that improves as
+            CognoraAI turns scattered course information into an explainable system that improves as
             you learn.
           </span>
           <Link className="marketing-secondary dark" href="/app">Create my workspace <ArrowRight size={15} /></Link>
         </div>
         <ol className="workflow-steps">
           <li><span>01</span><div><strong>Bring your context</strong><p>Add courses, materials, deadlines, availability, and goals.</p></div></li>
-          <li><span>02</span><div><strong>Let Cognora connect it</strong><p>AI turns your context into concepts, plans, practice, feedback, and roadmaps.</p></div></li>
+          <li><span>02</span><div><strong>Let CognoraAI connect it</strong><p>AI turns your context into concepts, plans, practice, feedback, and roadmaps.</p></div></li>
           <li><span>03</span><div><strong>Learn from evidence</strong><p>Every attempt updates explainable mastery signals and the next best action.</p></div></li>
         </ol>
       </section>
@@ -212,12 +212,12 @@ export default function MarketingHome() {
           <p>Consent-first by design</p>
           <h2>Your learning data should serve your learning.</h2>
           <span>
-            Course content stays private by default. Cognora uses it to provide the features you
+            Course content stays private by default. CognoraAI uses it to provide the features you
             request—not for advertising or sale.
           </span>
           <ul>
             <li><ShieldCheck size={17} /><div><strong>Private Appwrite infrastructure</strong><span>Account, database, storage, and Function access are permission-controlled.</span></div></li>
-            <li><CalendarSync size={17} /><div><strong>Google Calendar only when you connect it</strong><span>Cognora creates and updates study sessions from your plan; you can revoke access through Google.</span></div></li>
+            <li><CalendarSync size={17} /><div><strong>Google Calendar only when you connect it</strong><span>CognoraAI creates and updates study sessions from your plan; you can revoke access through Google.</span></div></li>
             <li><BrainCircuit size={17} /><div><strong>Transparent AI purpose</strong><span>DeepSeek and the configured embedding provider process only what is needed for requested learning features.</span></div></li>
           </ul>
           <div className="data-links">
@@ -232,14 +232,14 @@ export default function MarketingHome() {
         <p>Ready when your next course begins</p>
         <h2>Build a learning system that knows what comes next.</h2>
         <Link className="marketing-button light" href="/app">
-          Get started with Cognora <ArrowRight size={17} />
+          Get started with CognoraAI <ArrowRight size={17} />
         </Link>
       </section>
 
       <footer className="marketing-footer">
-        <Link className="marketing-brand" href="/" aria-label="Cognora AI home">
+        <Link className="marketing-brand" href="/" aria-label="CognoraAI home">
           <CognoraLogo size={38} />
-          <span><strong>Cognora</strong><small>Learning intelligence</small></span>
+          <span><strong>CognoraAI</strong><small>Learning intelligence</small></span>
         </Link>
         <p>AI-powered planning, understanding, practice, feedback, and mastery—in one private workspace.</p>
         <nav aria-label="Footer">
@@ -247,7 +247,7 @@ export default function MarketingHome() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </nav>
-        <small>© 2026 Cognora AI</small>
+        <small>© 2026 CognoraAI</small>
       </footer>
     </main>
   );

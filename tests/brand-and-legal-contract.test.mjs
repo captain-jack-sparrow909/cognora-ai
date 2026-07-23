@@ -46,3 +46,10 @@ test("ships Cognora brand assets and public Google verification pages", async ()
     assert.ok(asset.size > 0, `${path} should not be empty`);
   }
 });
+
+test("uses the CognoraAI name on the public landing page", async () => {
+  const home = await read("app/page.tsx");
+
+  assert.match(home, /<strong>CognoraAI<\/strong>/);
+  assert.doesNotMatch(home, /<strong>Cognora<\/strong>/);
+});
