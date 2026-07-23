@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { OnboardingScreen } from "@/components/auth/onboarding-screen";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -525,6 +526,10 @@ function AppLoading() {
       <CognoraLogo size={48} />
       <LoaderCircle className="spin" size={21} />
       <p>Connecting your learning workspace…</p>
+      <nav className="app-loading-legal" aria-label="Public legal information">
+        <Link href="/privacy">Privacy Policy</Link>
+        <Link href="/terms">Terms of Service</Link>
+      </nav>
     </main>
   );
 }

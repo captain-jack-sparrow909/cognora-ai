@@ -2086,6 +2086,19 @@ a {
   font-size: 12px;
 }
 
+.app-loading-legal {
+  display: flex;
+  gap: 14px;
+  margin-top: 3px;
+}
+
+.app-loading-legal a {
+  color: var(--cobalt);
+  font-size: 10px;
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
 .auth-page {
   min-height: 100vh;
   display: grid;
