@@ -1356,7 +1356,8 @@ async function createBillingCheckout(services, body) {
   const configuration = providerConfiguration("stripe");
   if (!configuration.configured) throw new Error("Stripe checkout is not configured yet.");
   const user = await services.admin.users.get({ userId: services.userId });
-  const baseUrl = (process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+  const publicBase = (process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+  const baseUrl = (process.env.APP_WORKSPACE_URL || (publicBase ? `${publicBase}/app` : "")).replace(/\/$/, "");
   if (!baseUrl) throw new Error("The production application URL is missing.");
   const params = new URLSearchParams({
     mode: "subscription",

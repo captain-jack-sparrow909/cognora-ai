@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("keeps the Phase 5 realtime and operations contract wired end to end", async () => {
   const [page, operations, learningClient, engine, provision, styles] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/application/cognora-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/operations/operations-workspaces.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/appwrite/learning-engine.ts", import.meta.url), "utf8"),
     readFile(new URL("../functions/learning-engine/src/main.js", import.meta.url), "utf8"),

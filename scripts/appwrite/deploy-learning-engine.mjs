@@ -4,6 +4,7 @@ import {
   Client,
   Functions,
   ProjectKeyScopes,
+  Query,
   Role,
   Runtime,
 } from "node-appwrite";
@@ -75,6 +76,7 @@ const variables = [
   ["google_calendar_ready", "GOOGLE_CALENDAR_READY", process.env.GOOGLE_CALENDAR_READY || "false", false],
   ["stripe_ready", "STRIPE_READY", process.env.STRIPE_READY || "false", false],
   ["app_public_url", "APP_PUBLIC_URL", process.env.APP_PUBLIC_URL || "https://cognora-ai.appwrite.network", false],
+  ["learning_workspace_url_v1", "APP_WORKSPACE_URL", process.env.APP_WORKSPACE_URL || `${(process.env.APP_PUBLIC_URL || "https://cognora-ai.appwrite.network").replace(/\/$/, "")}/app`, false],
 ];
 if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.env.EMBEDDING_MODEL) {
   variables.push(
@@ -97,7 +99,7 @@ for (const [variableId, key, value, secret] of [
 ]) {
   if (value) variables.push([variableId, key, value, secret]);
 }
-const existing = await functions.listVariables({ functionId, total: false });
+const existing = await functions.listVariables({ functionId, queries: [Query.limit(100)], total: false });
 for (const [variableId, key, value, secret] of variables) {
   const match = existing.variables.find((variable) => variable.key === key);
   if (match) await functions.updateVariable({ functionId, variableId: match.$id, key, value, secret });

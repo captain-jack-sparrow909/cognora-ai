@@ -12,7 +12,7 @@ test("keeps the Phase 8 collaboration and launch-gate contract wired end to end"
     readFile(new URL("../lib/appwrite/courses.ts", import.meta.url), "utf8"),
     readFile(new URL("../scripts/appwrite/load-launch.mjs", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/application/cognora-app.tsx", import.meta.url), "utf8"),
   ]);
 
   for (const table of ["course_invites", "launch_cohorts", "cohort_memberships", "security_events"]) assert.match(provision, new RegExp(`id: "${table}"`));

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { Client, Functions, ProjectKeyScopes, Role, Runtime } from "node-appwrite";
+import { Client, Functions, ProjectKeyScopes, Query, Role, Runtime } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 
 const required = ["NEXT_PUBLIC_APPWRITE_ENDPOINT", "NEXT_PUBLIC_APPWRITE_PROJECT_ID", "APPWRITE_API_KEY", "APPWRITE_DATABASE_ID"];
@@ -30,7 +30,7 @@ const variables = [
   ["billing_stripe_price_pro", "STRIPE_PRICE_PRO", process.env.STRIPE_PRICE_PRO, false],
 ].filter(([, , value]) => Boolean(value));
 if (process.env.STRIPE_PRICE_EDUCATION) variables.push(["billing_stripe_price_education", "STRIPE_PRICE_EDUCATION", process.env.STRIPE_PRICE_EDUCATION, false]);
-const existing = await functions.listVariables({ functionId, total: false });
+const existing = await functions.listVariables({ functionId, queries: [Query.limit(100)], total: false });
 for (const [variableId, key, value, secret] of variables) {
   const match = existing.variables.find((variable) => variable.key === key);
   if (match) await functions.updateVariable({ functionId, variableId: match.$id, key, value, secret });

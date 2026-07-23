@@ -13,7 +13,7 @@ test("keeps the Phase 9 provider activation and billing contract wired end to en
     readFile(new URL("../scripts/appwrite/deploy-learning-engine.mjs", import.meta.url), "utf8"),
     readFile(new URL("../scripts/appwrite/deploy-billing-webhook.mjs", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/application/cognora-app.tsx", import.meta.url), "utf8"),
   ]);
   for (const table of ["provider_activations", "subscriptions", "billing_events", "launch_approvals"]) assert.match(provision, new RegExp(`id: "${table}"`));
   for (const action of ["get_provider_activation_snapshot", "verify_provider_activations", "backfill_embeddings", "create_billing_checkout", "create_final_launch_approval"]) {

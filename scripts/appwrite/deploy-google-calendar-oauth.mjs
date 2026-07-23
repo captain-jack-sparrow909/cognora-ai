@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { Client, Functions, ProjectKeyScopes, Role, Runtime } from "node-appwrite";
+import { Client, Functions, ProjectKeyScopes, Query, Role, Runtime } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 
 const required = ["NEXT_PUBLIC_APPWRITE_ENDPOINT", "NEXT_PUBLIC_APPWRITE_PROJECT_ID", "APPWRITE_API_KEY", "APPWRITE_DATABASE_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_CALENDAR_REDIRECT_URI", "CALENDAR_TOKEN_ENCRYPTION_KEY", "APP_PUBLIC_URL"];
@@ -22,8 +22,9 @@ const variables = [
   ["google_oauth_redirect", "GOOGLE_CALENDAR_REDIRECT_URI", process.env.GOOGLE_CALENDAR_REDIRECT_URI, false],
   ["google_oauth_encryption", "CALENDAR_TOKEN_ENCRYPTION_KEY", process.env.CALENDAR_TOKEN_ENCRYPTION_KEY, true],
   ["google_oauth_public_url", "APP_PUBLIC_URL", process.env.APP_PUBLIC_URL, false],
+  ["google_oauth_workspace_url", "APP_WORKSPACE_URL", process.env.APP_WORKSPACE_URL || `${process.env.APP_PUBLIC_URL.replace(/\/$/, "")}/app`, false],
 ];
-const existing = await functions.listVariables({ functionId, total: false });
+const existing = await functions.listVariables({ functionId, queries: [Query.limit(100)], total: false });
 for (const [variableId, key, value, secret] of variables) {
   const match = existing.variables.find((variable) => variable.key === key);
   if (match) await functions.updateVariable({ functionId, variableId: match.$id, key, value, secret });

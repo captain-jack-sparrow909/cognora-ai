@@ -11,7 +11,7 @@ test("keeps the Phase 7 launch and scale contract wired end to end", async () =>
     readFile(new URL("../scripts/appwrite/provision.mjs", import.meta.url), "utf8"),
     readFile(new URL("../scripts/appwrite/deploy-learning-engine.mjs", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/application/cognora-app.tsx", import.meta.url), "utf8"),
   ]);
 
   for (const table of ["entitlements", "launch_preferences", "calendar_connections", "course_members", "launch_admins"]) {

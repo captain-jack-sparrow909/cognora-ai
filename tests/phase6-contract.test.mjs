@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("keeps the Phase 6 beta growth contract wired end to end", async () => {
   const [page, manifest, worker, beta, analytics, engine, provision] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/application/cognora-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/manifest.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
     readFile(new URL("../components/operations/beta-growth-workspace.tsx", import.meta.url), "utf8"),

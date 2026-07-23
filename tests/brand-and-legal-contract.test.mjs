@@ -5,10 +5,11 @@ import test from "node:test";
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("ships Cognora brand assets and public Google verification pages", async () => {
-  const [layout, manifest, home, auth, privacy, terms] = await Promise.all([
+  const [layout, manifest, home, workspace, auth, privacy, terms] = await Promise.all([
     read("app/layout.tsx"),
     read("app/manifest.ts"),
     read("app/page.tsx"),
+    read("components/application/cognora-app.tsx"),
     read("components/auth/auth-screen.tsx"),
     read("app/privacy/page.tsx"),
     read("app/terms/page.tsx"),
@@ -19,9 +20,16 @@ test("ships Cognora brand assets and public Google verification pages", async ()
   assert.match(manifest, /cognora-logo-google\.png/);
   assert.match(auth, /href="\/privacy"/);
   assert.match(auth, /href="\/terms"/);
-  assert.match(home, /Public legal information/);
+  assert.match(home, /Turn every course into a plan you can actually follow/);
+  assert.match(home, /Study Planner/);
+  assert.match(home, /Lecture Companion/);
+  assert.match(home, /Learning Roadmaps/);
+  assert.match(home, /Assignment Feedback/);
+  assert.match(home, /Knowledge Gap Detector/);
   assert.match(home, /href="\/privacy"/);
   assert.match(home, /href="\/terms"/);
+  assert.match(home, /href="\/app"/);
+  assert.match(workspace, /Public legal information/);
   assert.match(privacy, /Google API Services User Data Policy/);
   assert.match(privacy, /Limited Use requirements/);
   assert.match(terms, /AI output and academic responsibility/);

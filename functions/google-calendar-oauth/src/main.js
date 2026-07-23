@@ -30,7 +30,8 @@ function encrypt(value) {
 }
 
 function redirect(res, outcome) {
-  const base = String(process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+  const publicBase = String(process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+  const base = String(process.env.APP_WORKSPACE_URL || (publicBase ? `${publicBase}/app` : "")).replace(/\/$/, "");
   return res.redirect(`${base}/?calendar=${encodeURIComponent(outcome)}`, 302);
 }
 
