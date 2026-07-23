@@ -62,10 +62,11 @@ Email, Google Calendar OAuth, vector embeddings, and billing are provider-ready.
 2. Install dependencies with `npm install`.
 3. Provision the Appwrite resources with `npm run appwrite:provision`.
 4. Deploy the learning function with `npm run appwrite:deploy-function`.
-5. After configuring Stripe, deploy the signed webhook with `npm run appwrite:deploy-billing-webhook`.
-6. Optionally validate the full temporary learning, intelligence, retrieval, beta, launch-administration, operations, and reminder loop with `npm run appwrite:smoke-learning`.
-7. Optionally run the concurrent launch snapshot check with `npm run appwrite:load-launch`.
-8. Start the app with `npm run dev`.
+5. Deploy the Google Calendar OAuth callback with `npm run appwrite:deploy-google-calendar`, then register `GOOGLE_CALENDAR_REDIRECT_URI` in Google Cloud.
+6. After configuring Stripe, deploy the signed webhook with `npm run appwrite:deploy-billing-webhook`.
+7. Optionally validate the full temporary learning, intelligence, retrieval, beta, launch-administration, operations, and reminder loop with `npm run appwrite:smoke-learning`.
+8. Optionally run the concurrent launch snapshot check with `npm run appwrite:load-launch`.
+9. Start the app with `npm run dev`.
 
 ## Validation
 

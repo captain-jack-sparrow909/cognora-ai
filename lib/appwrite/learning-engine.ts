@@ -24,12 +24,14 @@ type LearningAction =
   | { action: "get_provider_activation_snapshot" }
   | { action: "verify_provider_activations" }
   | { action: "backfill_embeddings"; limit?: number }
+  | { action: "create_google_calendar_authorization" }
+  | { action: "sync_google_calendar" }
   | { action: "create_billing_checkout"; plan: "pro" | "education" }
   | { action: "create_final_launch_approval" };
 
-type InstantAction = "submit_attempt" | "sync_reminders" | "get_launch_snapshot" | "claim_launch_admin" | "create_course_invite" | "accept_course_invite" | "create_launch_cohort" | "join_launch_cohort" | "run_launch_review" | "get_provider_activation_snapshot" | "verify_provider_activations" | "backfill_embeddings" | "create_billing_checkout" | "create_final_launch_approval";
+type InstantAction = "submit_attempt" | "sync_reminders" | "get_launch_snapshot" | "claim_launch_admin" | "create_course_invite" | "accept_course_invite" | "create_launch_cohort" | "join_launch_cohort" | "run_launch_review" | "get_provider_activation_snapshot" | "verify_provider_activations" | "backfill_embeddings" | "create_google_calendar_authorization" | "sync_google_calendar" | "create_billing_checkout" | "create_final_launch_approval";
 
-const instantActions: LearningAction["action"][] = ["submit_attempt", "sync_reminders", "get_launch_snapshot", "claim_launch_admin", "create_course_invite", "accept_course_invite", "create_launch_cohort", "join_launch_cohort", "run_launch_review", "get_provider_activation_snapshot", "verify_provider_activations", "backfill_embeddings", "create_billing_checkout", "create_final_launch_approval"];
+const instantActions: LearningAction["action"][] = ["submit_attempt", "sync_reminders", "get_launch_snapshot", "claim_launch_admin", "create_course_invite", "accept_course_invite", "create_launch_cohort", "join_launch_cohort", "run_launch_review", "get_provider_activation_snapshot", "verify_provider_activations", "backfill_embeddings", "create_google_calendar_authorization", "sync_google_calendar", "create_billing_checkout", "create_final_launch_approval"];
 
 const jobLabels: Record<Exclude<LearningAction["action"], InstantAction>, string> = {
   process_material: "Analyzing course material",

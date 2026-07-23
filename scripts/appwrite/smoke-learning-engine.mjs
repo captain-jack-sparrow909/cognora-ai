@@ -227,7 +227,7 @@ try {
     tables.createRow({ databaseId, tableId: "product_feedback", rowId: ID.unique(), data: { ownerId: created.userId, category: "delight", rating: 5, message: "Phase 6 validation feedback.", status: "new", createdAt: now }, permissions }),
     tables.createRow({ databaseId, tableId: "entitlements", rowId: created.userId, data: { ownerId: created.userId, plan: "founding-beta", status: "active", aiDailyLimit: 40, storageLimitMb: 1024, collaborationSeats: 3, updatedAt: now }, permissions }),
     tables.createRow({ databaseId, tableId: "launch_preferences", rowId: created.userId, data: { ownerId: created.userId, releaseChannel: "private-beta", autoUpdates: true, providerAlerts: true, updatedAt: now }, permissions }),
-    tables.createRow({ databaseId, tableId: "calendar_connections", rowId: `${created.userId}-google`, data: { ownerId: created.userId, provider: "google", status: "not-configured", syncMode: "two-way", conflictPolicy: "ask", updatedAt: now }, permissions }),
+    tables.createRow({ databaseId, tableId: "calendar_connections", rowId: `${created.userId}-google`, data: { ownerId: created.userId, provider: "google", status: "not-configured", syncMode: "export", conflictPolicy: "ask", updatedAt: now }, permissions }),
     tables.createRow({ databaseId, tableId: "course_members", rowId: ID.unique(), data: { ownerId: created.userId, courseId: created.courseId, memberId: created.userId, role: "owner", status: "active", joinedAt: now }, permissions }),
   ]);
 

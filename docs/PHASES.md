@@ -54,7 +54,7 @@ Delivered with private in-app reminders, realtime AI job progress, completion/fa
 - Searchable source retrieval for larger multi-course libraries
 - Email provider readiness check
 
-Delivered with an installable PWA shell, safe static-asset caching, `.ics` export, direct Google Calendar and Outlook event creation, opt-in content-free analytics, private beta feedback, founding-beta cohort preferences, and Appwrite full-text retrieval across material chunks for grounded coaching. The live Appwrite project has no messaging provider configured, so email delivery remains intentionally disabled and accurately labeled instead of simulating delivery.
+Delivered with an installable PWA shell, safe static-asset caching, `.ics` export, direct Google Calendar event creation, opt-in content-free analytics, private beta feedback, founding-beta cohort preferences, and Appwrite full-text retrieval across material chunks for grounded coaching. Google-only OAuth synchronization was added during production hookup with encrypted server-side refresh credentials. The live Appwrite project has no messaging provider configured, so email delivery remains intentionally disabled and accurately labeled instead of simulating delivery.
 
 ## Phase 7 — Launch and scale ✅
 

@@ -8,7 +8,7 @@ import type { LaunchApproval, ProviderActivation, ProviderActivationSnapshot } f
 
 const providerMeta: Record<ProviderActivation["provider"], { label: string; purpose: string; icon: typeof Mail }> = {
   email: { label: "Email delivery", purpose: "Verified reminders and collaboration invitations", icon: Mail },
-  "google-calendar": { label: "Google Calendar", purpose: "OAuth-backed two-way schedule synchronization", icon: CalendarSync },
+  "google-calendar": { label: "Google Calendar", purpose: "OAuth-backed study-plan synchronization", icon: CalendarSync },
   embeddings: { label: "Vector retrieval", purpose: "Semantic source search and controlled backfill", icon: DatabaseZap },
   stripe: { label: "Stripe billing", purpose: "Checkout, signed webhooks, and entitlement lifecycle", icon: CreditCard },
   "custom-domain": { label: "Production site", purpose: "Verified Appwrite Sites URL and live application manifest", icon: Globe2 },

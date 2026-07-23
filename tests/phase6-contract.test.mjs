@@ -20,14 +20,16 @@ test("keeps the Phase 6 beta growth contract wired end to end", async () => {
   assert.match(worker, /script.*style.*font.*image/);
   assert.match(beta, /text\/calendar/);
   assert.match(beta, /calendar\.google\.com/);
-  assert.match(beta, /outlook\.live\.com/);
+  assert.doesNotMatch(beta, /outlook\.live\.com/);
+  assert.match(beta, /create_google_calendar_authorization/);
+  assert.match(beta, /sync_google_calendar/);
   assert.match(beta, /analyticsEnabled/);
   assert.match(analytics, /allowedEvents/);
   assert.doesNotMatch(analytics, /courseId|materialId|question|answer|content/);
   assert.match(engine, /knowledge_chunks/);
   assert.match(engine, /Query\.search\("content", message\)/);
   assert.match(engine, /Retrieved source passages/);
-  for (const table of ["knowledge_chunks", "beta_profiles", "analytics_events", "product_feedback"]) {
+  for (const table of ["knowledge_chunks", "beta_profiles", "analytics_events", "product_feedback", "calendar_oauth_states", "calendar_credentials", "calendar_event_links"]) {
     assert.match(provision, new RegExp(`id: "${table}"`));
   }
   assert.match(provision, /TablesDBIndexType\.Fulltext/);

@@ -86,6 +86,8 @@ if (process.env.EMBEDDING_API_KEY && process.env.EMBEDDING_BASE_URL && process.e
 for (const [variableId, key, value, secret] of [
   ["google_client_id", "GOOGLE_CLIENT_ID", process.env.GOOGLE_CLIENT_ID, false],
   ["google_client_secret", "GOOGLE_CLIENT_SECRET", process.env.GOOGLE_CLIENT_SECRET, true],
+  ["google_calendar_redirect", "GOOGLE_CALENDAR_REDIRECT_URI", process.env.GOOGLE_CALENDAR_REDIRECT_URI, false],
+  ["calendar_token_encryption", "CALENDAR_TOKEN_ENCRYPTION_KEY", process.env.CALENDAR_TOKEN_ENCRYPTION_KEY, true],
   ["stripe_secret", "STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY, true],
   ["stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET, true],
   ["stripe_webhook_secret_1", "STRIPE_WEBHOOK_SECRET_1", process.env.STRIPE_WEBHOOK_SECRET_1, true],

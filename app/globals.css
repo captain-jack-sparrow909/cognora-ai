@@ -1291,7 +1291,8 @@ a {
 .calendar-summary > div { display: grid; gap: 5px; }
 .calendar-summary strong { font-size: 11px; }
 .calendar-summary span { color: var(--ink-faint); font-size: 8px; }
-.calendar-summary button, .calendar-links a { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; color: #fff; border: 0; border-radius: 9px; background: var(--cobalt); cursor: pointer; font-size: 8px; font-weight: 750; }
+.calendar-summary button, .calendar-links a, .calendar-links button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; color: #fff; border: 0; border-radius: 9px; background: var(--cobalt); cursor: pointer; font-size: 8px; font-weight: 750; }
+.calendar-links button:disabled { opacity: .45; cursor: not-allowed; }
 .calendar-summary button:disabled { opacity: .45; cursor: not-allowed; }
 .calendar-links { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .calendar-links p { width: 100%; margin: 0 0 2px; color: var(--ink-faint); font-size: 8px; }

@@ -5,7 +5,8 @@ import { ID, Query } from "appwrite";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { getAppwriteBrowserServices } from "@/lib/appwrite/client";
 import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
-import type { BetaProfile, ProductFeedback, StudyTask } from "@/lib/appwrite/models";
+import { executeLearningAction } from "@/lib/appwrite/learning-engine";
+import type { BetaProfile, CalendarConnection, ProductFeedback, StudyTask } from "@/lib/appwrite/models";
 import { privateUserPermissions } from "@/lib/appwrite/permissions";
 import { trackProductEvent } from "@/lib/appwrite/product-analytics";
 
@@ -25,15 +26,11 @@ function calendarDetails(task: StudyTask) {
   return `${task.durationMinutes} minute Cognora study session${task.reason ? ` — ${task.reason}` : ""}`;
 }
 
-function externalCalendarUrl(provider: "google" | "outlook", task: StudyTask) {
+function externalCalendarUrl(task: StudyTask) {
   const start = new Date(task.scheduledFor);
   const end = endDate(task);
-  if (provider === "google") {
-    const query = new URLSearchParams({ action: "TEMPLATE", text: task.title, dates: `${calendarStamp(start.toISOString())}/${calendarStamp(end.toISOString())}`, details: calendarDetails(task) });
-    return `https://calendar.google.com/calendar/render?${query}`;
-  }
-  const query = new URLSearchParams({ path: "/calendar/action/compose", rru: "addevent", subject: task.title, startdt: start.toISOString(), enddt: end.toISOString(), body: calendarDetails(task) });
-  return `https://outlook.live.com/calendar/0/deeplink/compose?${query}`;
+  const query = new URLSearchParams({ action: "TEMPLATE", text: task.title, dates: `${calendarStamp(start.toISOString())}/${calendarStamp(end.toISOString())}`, details: calendarDetails(task) });
+  return `https://calendar.google.com/calendar/render?${query}`;
 }
 
 function downloadCalendar(tasks: StudyTask[]) {
@@ -60,6 +57,8 @@ export function BetaGrowthWorkspace({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<BetaProfile | null>(null);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [feedback, setFeedback] = useState<ProductFeedback[]>([]);
+  const [calendarConnection, setCalendarConnection] = useState<CalendarConnection | null>(null);
+  const [calendarBusy, setCalendarBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -68,16 +67,38 @@ export function BetaGrowthWorkspace({ userId }: { userId: string }) {
     try {
       const { tables, config } = getAppwriteBrowserServices();
       const now = new Date().toISOString();
-      const [profiles, taskRows, feedbackRows] = await Promise.all([
+      const [profiles, taskRows, feedbackRows, connectionRows] = await Promise.all([
         tables.listRows<BetaProfile>({ databaseId: config.databaseId, tableId: "beta_profiles", queries: [Query.equal("ownerId", [userId]), Query.limit(1)], ttl: 0 }),
         tables.listRows<StudyTask>({ databaseId: config.databaseId, tableId: "study_tasks", queries: [Query.equal("ownerId", [userId]), Query.equal("status", ["planned"]), Query.greaterThanEqual("scheduledFor", [now]), Query.orderAsc("scheduledFor"), Query.limit(50)], ttl: 0 }),
         tables.listRows<ProductFeedback>({ databaseId: config.databaseId, tableId: "product_feedback", queries: [Query.equal("ownerId", [userId]), Query.orderDesc("createdAt"), Query.limit(5)], ttl: 0 }),
+        tables.listRows<CalendarConnection>({ databaseId: config.databaseId, tableId: "calendar_connections", queries: [Query.equal("ownerId", [userId]), Query.equal("provider", ["google"]), Query.limit(1)], ttl: 0 }),
       ]);
       setProfile(profiles.rows[0] || null);
       setTasks(taskRows.rows);
       setFeedback(feedbackRows.rows);
+      setCalendarConnection(connectionRows.rows[0] || null);
     } catch (caught) { setError(getAppwriteErrorMessage(caught)); }
   }, [userId]);
+
+  async function connectGoogleCalendar() {
+    setCalendarBusy(true); setError(""); setMessage("");
+    try {
+      const result = await executeLearningAction<{ authorizationUrl: string }>({ action: "create_google_calendar_authorization" });
+      window.location.assign(result.authorizationUrl);
+    } catch (caught) {
+      setError(getAppwriteErrorMessage(caught)); setCalendarBusy(false);
+    }
+  }
+
+  async function syncGoogleCalendar() {
+    setCalendarBusy(true); setError(""); setMessage("");
+    try {
+      const result = await executeLearningAction<{ created: number; updated: number; total: number }>({ action: "sync_google_calendar" });
+      setMessage(`Google Calendar synced ${result.total} session${result.total === 1 ? "" : "s"} (${result.created} created, ${result.updated} updated).`);
+      await load();
+    } catch (caught) { setError(getAppwriteErrorMessage(caught)); }
+    finally { setCalendarBusy(false); }
+  }
 
   useEffect(() => { queueMicrotask(() => void load()); }, [load]);
 
@@ -132,7 +153,7 @@ export function BetaGrowthWorkspace({ userId }: { userId: string }) {
       <article className="settings-panel calendar-panel">
         <header><span><CalendarDays size={19} /></span><div><p className="card-kicker">Calendar portability</p><h2>Your plan, where you work</h2></div></header>
         <div className="calendar-summary"><div><strong>{upcomingLabel}</strong><span>{nextTask ? `Next: ${nextTask.title}` : "Generate a study plan to add sessions."}</span></div><button type="button" disabled={!tasks.length} onClick={() => { downloadCalendar(tasks); void trackProductEvent(userId, "calendar_exported", "settings", { sessions: tasks.length }).catch(() => undefined); }}><Download size={15} />Export .ics</button></div>
-        {nextTask && <div className="calendar-links"><p>Add the next session directly</p><a href={externalCalendarUrl("google", nextTask)} target="_blank" rel="noreferrer" onClick={() => void trackProductEvent(userId, "calendar_link_opened", "settings", { provider: "google" }).catch(() => undefined)}>Google Calendar <ExternalLink size={13} /></a><a href={externalCalendarUrl("outlook", nextTask)} target="_blank" rel="noreferrer" onClick={() => void trackProductEvent(userId, "calendar_link_opened", "settings", { provider: "outlook" }).catch(() => undefined)}>Outlook <ExternalLink size={13} /></a></div>}
+        <div className="calendar-links"><p>{calendarConnection?.status === "connected" ? "Keep planned sessions synchronized" : "Connect Google Calendar for one-click plan synchronization"}</p>{calendarConnection?.status === "connected" ? <button type="button" disabled={calendarBusy || !tasks.length} onClick={() => void syncGoogleCalendar()}>{calendarBusy ? <LoaderCircle className="spin" size={13} /> : <CalendarDays size={13} />}Sync Google Calendar</button> : <button type="button" disabled={calendarBusy} onClick={() => void connectGoogleCalendar()}>{calendarBusy ? <LoaderCircle className="spin" size={13} /> : <CalendarDays size={13} />}Connect Google Calendar</button>}{nextTask && <a href={externalCalendarUrl(nextTask)} target="_blank" rel="noreferrer" onClick={() => void trackProductEvent(userId, "calendar_link_opened", "settings", { provider: "google" }).catch(() => undefined)}>Add next session manually <ExternalLink size={13} /></a>}</div>
         <p className="operations-note"><ShieldCheck size={15} />Exports include session titles, timing, duration, and planning reason. They do not include uploaded material, answers, or coach conversations.</p>
       </article>
       <article className="settings-panel beta-panel">

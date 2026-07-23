@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { Client, ID, Messaging, Permission, Query, Role, Storage, TablesDB, Users } from "node-appwrite";
 import { OfficeParser } from "officeparser";
 
@@ -114,6 +114,121 @@ async function embedTexts(inputs) {
   if (!response.ok) throw new Error(`Embedding request failed (${response.status}).`);
   const payload = await response.json();
   return (payload.data || []).sort((a, b) => a.index - b.index).map((item) => Array.isArray(item.embedding) ? item.embedding : []);
+}
+
+function calendarEncryptionKey() {
+  const key = Buffer.from(process.env.CALENDAR_TOKEN_ENCRYPTION_KEY || "", "hex");
+  if (key.length !== 32) throw new Error("Calendar token encryption key must contain 32 bytes.");
+  return key;
+}
+
+function decryptCalendarSecret(value) {
+  const [ivText, tagText, encryptedText] = String(value || "").split(".");
+  if (!ivText || !tagText || !encryptedText) throw new Error("Stored Google Calendar credentials are invalid.");
+  const decipher = createDecipheriv("aes-256-gcm", calendarEncryptionKey(), Buffer.from(ivText, "base64url"));
+  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedText, "base64url")), decipher.final()]).toString("utf8");
+}
+
+async function createGoogleCalendarAuthorization(services) {
+  if (!services.admin) throw new Error("Google Calendar connection requires the server function key.");
+  const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !redirectUri) throw new Error("Google Calendar OAuth is not configured.");
+  const stateId = ID.unique();
+  const stateSecret = randomBytes(32).toString("base64url");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 10 * 60_000);
+  await services.admin.tables.createRow({
+    databaseId: services.databaseId,
+    tableId: "calendar_oauth_states",
+    rowId: stateId,
+    data: {
+      ownerId: services.userId,
+      stateHash: createHash("sha256").update(stateSecret).digest("hex"),
+      expiresAt: expiresAt.toISOString(),
+      createdAt: now.toISOString(),
+    },
+    permissions: [],
+  });
+  const query = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "https://www.googleapis.com/auth/calendar.events",
+    access_type: "offline",
+    include_granted_scopes: "true",
+    prompt: "consent",
+    state: `${stateId}.${stateSecret}`,
+  });
+  return { ok: true, authorizationUrl: `https://accounts.google.com/o/oauth2/v2/auth?${query}`, expiresAt: expiresAt.toISOString() };
+}
+
+async function googleAccessToken(services) {
+  const credential = await services.admin.tables.getRow({ databaseId: services.databaseId, tableId: "calendar_credentials", rowId: services.userId });
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: decryptCalendarSecret(credential.refreshTokenEncrypted),
+      grant_type: "refresh_token",
+    }),
+  });
+  const token = await response.json();
+  if (!response.ok || !token.access_token) throw new Error(token.error_description || token.error || `Google token refresh failed (${response.status}).`);
+  return token.access_token;
+}
+
+async function syncGoogleCalendar(services) {
+  if (!services.admin) throw new Error("Google Calendar sync requires the server function key.");
+  const accessToken = await googleAccessToken(services);
+  const now = new Date().toISOString();
+  const [tasks, links] = await Promise.all([
+    services.tables.listRows({ databaseId: services.databaseId, tableId: "study_tasks", queries: [Query.equal("ownerId", [services.userId]), Query.equal("status", ["planned"]), Query.greaterThanEqual("scheduledFor", [now]), Query.orderAsc("scheduledFor"), Query.limit(50)] }),
+    services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "calendar_event_links", queries: [Query.equal("ownerId", [services.userId]), Query.limit(100)] }),
+  ]);
+  const byTask = new Map(links.rows.map((link) => [link.taskId, link]));
+  let created = 0;
+  let updated = 0;
+  for (const task of tasks.rows) {
+    const start = new Date(task.scheduledFor);
+    const end = new Date(start.getTime() + Number(task.durationMinutes || 30) * 60_000);
+    const event = {
+      summary: task.title,
+      description: `${task.durationMinutes} minute Cognora study session${task.reason ? ` — ${task.reason}` : ""}`,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() },
+      extendedProperties: { private: { cognoraTaskId: task.$id } },
+    };
+    const link = byTask.get(task.$id);
+    const url = link
+      ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(link.eventId)}`
+      : "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+    const response = await fetch(url, {
+      method: link ? "PUT" : "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    const saved = await response.json();
+    if (!response.ok || !saved.id) throw new Error(saved.error?.message || `Google Calendar sync failed (${response.status}).`);
+    await services.admin.tables.upsertRow({
+      databaseId: services.databaseId,
+      tableId: "calendar_event_links",
+      rowId: link?.$id || ID.unique(),
+      data: { ownerId: services.userId, taskId: task.$id, eventId: saved.id, calendarId: "primary", updatedAt: now },
+      permissions: [],
+    });
+    if (link) updated += 1; else created += 1;
+  }
+  await services.admin.tables.upsertRow({
+    databaseId: services.databaseId,
+    tableId: "calendar_connections",
+    rowId: `${services.userId}-google`,
+    data: { ownerId: services.userId, provider: "google", status: "connected", syncMode: "export", conflictPolicy: "ask", lastSyncAt: now, updatedAt: now },
+    permissions: userPermissions(services.userId),
+  });
+  return { ok: true, created, updated, total: tasks.rows.length, syncedAt: now };
 }
 
 function cosineSimilarity(left, right) {
@@ -1138,6 +1253,11 @@ async function verifyOneProvider(services, provider) {
     const enabled = result.providers.some((candidate) => candidate.enabled && ["email", "smtp", "mailgun", "sendgrid"].includes(String(candidate.type || "").toLowerCase()));
     return { provider, status: enabled && process.env.APPWRITE_EMAIL_READY === "true" ? "verified" : enabled ? "configured" : "unconfigured", configuration: { configured: enabled, detail: enabled ? "Enabled Appwrite email provider detected" : configuration.detail }, error: enabled ? undefined : "No enabled Appwrite email provider was detected." };
   }
+  if (provider === "google-calendar") {
+    const credentials = await services.admin.tables.listRows({ databaseId: services.databaseId, tableId: "calendar_credentials", queries: [Query.equal("ownerId", [services.userId]), Query.limit(1)] });
+    const connected = credentials.rows.length > 0;
+    return { provider, status: connected ? "verified" : "configured", configuration: { ...configuration, connected }, error: connected ? undefined : "Complete Google consent from the production workspace." };
+  }
   if (provider === "embeddings") {
     const vector = (await embedTexts(["Cognora provider readiness check"]))[0];
     if (!vector?.length) throw new Error("The embedding provider returned no vector.");
@@ -1155,8 +1275,7 @@ async function verifyOneProvider(services, provider) {
     if (response.status < 200 || response.status >= 400) throw new Error(`Production site returned HTTP ${response.status}.`);
     return { provider, status: "verified", configuration };
   }
-  const readyFlag = process.env.GOOGLE_CALENDAR_READY;
-  return { provider, status: readyFlag === "true" ? "verified" : "configured", configuration, error: readyFlag === "true" ? undefined : "OAuth redirect and consent verification are still required." };
+  return { provider, status: "configured", configuration };
 }
 
 async function persistProviderActivation(services, result) {
@@ -1395,6 +1514,8 @@ async function main({ req, res, log, error }) {
     else if (body.action === "get_provider_activation_snapshot") result = await getProviderActivationSnapshot(services);
     else if (body.action === "verify_provider_activations") result = await verifyProviderActivations(services);
     else if (body.action === "backfill_embeddings") result = await backfillEmbeddings(services, body);
+    else if (body.action === "create_google_calendar_authorization") result = await createGoogleCalendarAuthorization(services);
+    else if (body.action === "sync_google_calendar") result = await syncGoogleCalendar(services);
     else if (body.action === "create_billing_checkout") result = await createBillingCheckout(services, body);
     else if (body.action === "create_final_launch_approval") result = await createFinalLaunchApproval(services);
     else throw new Error("Unknown learning engine action.");

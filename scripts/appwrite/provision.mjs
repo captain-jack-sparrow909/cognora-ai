@@ -563,6 +563,52 @@ const definitions = [
     ],
   },
   {
+    id: "calendar_oauth_states",
+    name: "Private Google Calendar OAuth states",
+    createPermissions: [],
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "stateHash", type: "varchar", size: 64, required: true },
+      { key: "expiresAt", type: "datetime", required: true },
+      { key: "createdAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "owner_created", type: TablesDBIndexType.Key, columns: ["ownerId", "createdAt"] },
+      { key: "expiry", type: TablesDBIndexType.Key, columns: ["expiresAt"] },
+    ],
+  },
+  {
+    id: "calendar_credentials",
+    name: "Encrypted Google Calendar credentials",
+    createPermissions: [],
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "provider", type: "enum", elements: ["google"], required: true },
+      { key: "accessTokenEncrypted", type: "text", required: false },
+      { key: "refreshTokenEncrypted", type: "text", required: true },
+      { key: "tokenExpiresAt", type: "datetime", required: false },
+      { key: "scope", type: "text", required: true },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [{ key: "owner_unique", type: TablesDBIndexType.Unique, columns: ["ownerId"] }],
+  },
+  {
+    id: "calendar_event_links",
+    name: "Private Google Calendar event links",
+    createPermissions: [],
+    columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "taskId", type: "varchar", size: 36, required: true },
+      { key: "eventId", type: "varchar", size: 255, required: true },
+      { key: "calendarId", type: "varchar", size: 255, required: true },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "task_unique", type: TablesDBIndexType.Unique, columns: ["taskId"] },
+      { key: "owner_updated", type: TablesDBIndexType.Key, columns: ["ownerId", "updatedAt"] },
+    ],
+  },
+  {
     id: "course_members",
     name: "Course collaboration memberships",
     columns: [

@@ -15,6 +15,7 @@
     "appwrite:provision": "node --env-file=.env scripts/appwrite/provision.mjs",
     "appwrite:deploy-function": "node --env-file=.env scripts/appwrite/deploy-learning-engine.mjs",
     "appwrite:deploy-billing-webhook": "node --env-file=.env scripts/appwrite/deploy-billing-webhook.mjs",
+    "appwrite:deploy-google-calendar": "node --env-file=.env scripts/appwrite/deploy-google-calendar-oauth.mjs",
     "appwrite:smoke-learning": "node --env-file=.env scripts/appwrite/smoke-learning-engine.mjs",
     "appwrite:load-launch": "node --env-file=.env scripts/appwrite/load-launch.mjs"
   },

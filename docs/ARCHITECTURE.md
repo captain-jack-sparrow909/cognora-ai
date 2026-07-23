@@ -62,7 +62,10 @@
 
 - `entitlements`: private plan, AI-request, storage, and collaboration-seat limits
 - `launch_preferences`: private staged-release channel and provider-alert settings
-- `calendar_connections`: provider status, sync mode, conflict policy, and last-sync state
+- `calendar_connections`: user-visible Google connection status, sync policy, and last-sync state
+- `calendar_oauth_states`: short-lived, server-only OAuth CSRF state hashes
+- `calendar_credentials`: server-only Google refresh credentials encrypted with AES-256-GCM
+- `calendar_event_links`: server-only mappings between Cognora study tasks and Google events
 - `course_members`: owner, editor, and viewer membership foundations per course
 - `launch_admins`: server-created launch owner/operator roles with no browser create access
 
@@ -112,6 +115,7 @@
 - `create-billing-checkout`: server-created Stripe Checkout sessions with Appwrite user metadata
 - `create-final-launch-approval`: combines controlled-cohort health with all verified production dependencies and persists the decision
 - `billing-webhook`: separately deployable public Function that accepts only valid Stripe signatures, deduplicates events, and updates private subscriptions and entitlements
+- `google-calendar-oauth`: separately deployable public callback that verifies short-lived OAuth state, exchanges Google authorization codes, encrypts refresh credentials, and returns learners to the Appwrite Site
 - `deepseek-gateway`: the learning engine owns normalized JSON model access, one bounded retry for transient failures, token accounting, structured operational logs, and a configurable daily request limit
 
 Long-running AI actions create a user-owned `ai_jobs` row before execution. The browser subscribes to that exact row with Appwrite Realtime and retains a polling fallback. The function advances the job through queued, processing, reasoning, persistence, completed, or failed states, then emits a private notification. Operational records exclude prompt, submission, and response content.
