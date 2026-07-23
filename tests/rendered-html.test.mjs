@@ -22,6 +22,8 @@ test("server-renders the public CognoraAI homepage", async () => {
   assert.match(html, /CognoraAI turns every course into a plan you can actually follow/);
   assert.match(html, /CognoraAI is an AI-powered learning platform for students/);
   assert.match(html, /Why CognoraAI requests Google Calendar data/);
+  assert.match(html, /application\/ld\+json/);
+  assert.match(html, /SoftwareApplication/);
   assert.match(html, /Study Planner/);
   assert.match(html, /Knowledge Gap Detector/);
   assert.match(html, /href="\/privacy"/);

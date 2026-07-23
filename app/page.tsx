@@ -63,9 +63,32 @@ const connectedFeatures = [
   { icon: ShieldCheck, title: "Private collaboration", copy: "Share course spaces without sharing personal attempts." },
 ];
 
+const publicApplicationSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "CognoraAI",
+  url: "https://cognora-ai.tech/",
+  applicationCategory: "EducationalApplication",
+  operatingSystem: "Web",
+  description:
+    "CognoraAI is an AI-powered learning platform for students that provides study planning, lecture support, learning roadmaps, assignment feedback, and knowledge-gap detection.",
+  featureList: [
+    "Study Planner",
+    "Lecture Companion",
+    "Learning Roadmap Generator",
+    "Assignment Feedback Tool",
+    "Knowledge Gap Detector",
+    "Optional Google Calendar study-session synchronization",
+  ],
+};
+
 export default function MarketingHome() {
   return (
     <main className="marketing-page" id="top">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(publicApplicationSchema) }}
+      />
       <a className="skip-link" href="#main-content">Skip to main content</a>
 
       <header className="marketing-header">

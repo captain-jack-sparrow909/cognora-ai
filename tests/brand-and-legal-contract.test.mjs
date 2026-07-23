@@ -72,4 +72,7 @@ test("explains CognoraAI and its Google Calendar data use without requiring logi
   assert.match(home, /create, update, and synchronize/);
   assert.match(home, /Google user data is not used for/);
   assert.match(home, /href="\/privacy"/);
+  assert.match(home, /"@type": "SoftwareApplication"/);
+  assert.match(home, /name: "CognoraAI"/);
+  assert.match(home, /url: "https:\/\/cognora-ai\.tech\/"/);
 });
