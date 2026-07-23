@@ -74,6 +74,7 @@ export default function MarketingHome() {
           <span><strong>CognoraAI</strong><small>Learning intelligence</small></span>
         </Link>
         <nav aria-label="Primary">
+          <a href="#about">About</a>
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
           <a href="#trust">Privacy</a>
@@ -89,11 +90,11 @@ export default function MarketingHome() {
       <section className="marketing-hero" id="main-content">
         <div className="marketing-hero-copy">
           <p className="marketing-pill"><Sparkles size={14} /> One connected AI learning workspace</p>
-          <h1>Turn every course into a plan you can actually follow.</h1>
+          <h1>CognoraAI turns every course into a plan you can actually follow.</h1>
           <p className="marketing-hero-lead">
-            CognoraAI brings study planning, lecture understanding, learning roadmaps, assignment
-            feedback, and knowledge-gap detection into one private platform—so every study session
-            has a clear purpose.
+            CognoraAI is an AI-powered learning platform for students. It brings study planning,
+            lecture understanding, learning roadmaps, assignment feedback, and knowledge-gap
+            detection into one private workspace—so every study session has a clear purpose.
           </p>
           <div className="marketing-hero-actions">
             <Link className="marketing-button" href="/app">
@@ -148,6 +149,44 @@ export default function MarketingHome() {
         <span><UploadCloud size={16} /><strong>Your own learning materials</strong></span>
         <span><Sparkles size={16} /><strong>DeepSeek-powered guidance</strong></span>
         <span><CalendarSync size={16} /><strong>Optional calendar sync</strong></span>
+      </section>
+
+      <section className="marketing-section purpose-section" id="about" aria-labelledby="purpose-title">
+        <div className="marketing-section-heading">
+          <p>About CognoraAI</p>
+          <h2 id="purpose-title">A connected learning platform that helps students know what to study next.</h2>
+          <span>
+            CognoraAI uses AI to turn a student&apos;s courses, learning materials, deadlines,
+            assignments, goals, and practice results into personalized study plans, lecture support,
+            learning roadmaps, actionable feedback, and explainable knowledge-gap insights.
+          </span>
+        </div>
+        <div className="purpose-grid">
+          <article>
+            <span className="purpose-number">01</span>
+            <div>
+              <strong>What CognoraAI does</strong>
+              <p>
+                Students can organize courses, understand lecture material, plan realistic study
+                sessions, receive rubric-based assignment feedback, practice key concepts, and track
+                mastery in one private workspace.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span className="purpose-number">02</span>
+            <div>
+              <strong>Why CognoraAI requests Google Calendar data</strong>
+              <p>
+                Google Calendar access is optional and requested only when a student chooses to
+                connect it. CognoraAI uses calendar event data to create, update, and synchronize
+                study sessions from the student&apos;s plan. Google user data is not used for
+                advertising or sold, and access can be revoked at any time.
+              </p>
+              <Link href="/privacy">Read how CognoraAI handles Google user data</Link>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section className="marketing-section features-section" id="features">

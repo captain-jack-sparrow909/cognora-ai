@@ -13,13 +13,15 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the public Cognora homepage", async () => {
+test("server-renders the public CognoraAI homepage", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /<title>Cognora AI/);
-  assert.match(html, /Turn every course into a plan you can actually follow/);
+  assert.match(html, /<title>CognoraAI/);
+  assert.match(html, /CognoraAI turns every course into a plan you can actually follow/);
+  assert.match(html, /CognoraAI is an AI-powered learning platform for students/);
+  assert.match(html, /Why CognoraAI requests Google Calendar data/);
   assert.match(html, /Study Planner/);
   assert.match(html, /Knowledge Gap Detector/);
   assert.match(html, /href="\/privacy"/);

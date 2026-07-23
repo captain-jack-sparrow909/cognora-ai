@@ -12,13 +12,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase: new URL(origin),
-    title: "Cognora AI — Your learning, finally connected",
+    title: "CognoraAI — AI-powered learning platform for students",
     description:
-      "A private AI learning workspace with adaptive planning, grounded guidance, secure collaboration, and server-verified production launch gates.",
+      "CognoraAI is an AI-powered learning platform for students with study planning, lecture support, learning roadmaps, assignment feedback, and knowledge-gap detection.",
     manifest: "/manifest.webmanifest",
-    applicationName: "Cognora AI",
+    applicationName: "CognoraAI",
     themeColor: "#10233c",
-    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Cognora" },
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "CognoraAI" },
     icons: {
       icon: [
         { url: "/brand/cognora-favicon-32.png", sizes: "32x32", type: "image/png" },
@@ -27,15 +27,15 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     },
     openGraph: {
-      title: "Cognora AI",
-      description: "Your learning, finally connected.",
+      title: "CognoraAI",
+      description: "An AI-powered learning platform for students.",
       type: "website",
-      images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "Cognora AI — Your learning, finally connected" }],
+      images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "CognoraAI — Your learning, finally connected" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Cognora AI",
-      description: "Your learning, finally connected.",
+      title: "CognoraAI",
+      description: "An AI-powered learning platform for students.",
       images: [`${origin}/og.png`],
     },
   };

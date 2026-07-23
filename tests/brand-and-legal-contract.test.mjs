@@ -20,7 +20,7 @@ test("ships Cognora brand assets and public Google verification pages", async ()
   assert.match(manifest, /cognora-logo-google\.png/);
   assert.match(auth, /href="\/privacy"/);
   assert.match(auth, /href="\/terms"/);
-  assert.match(home, /Turn every course into a plan you can actually follow/);
+  assert.match(home, /CognoraAI turns every course into a plan you can actually follow/);
   assert.match(home, /Study Planner/);
   assert.match(home, /Lecture Companion/);
   assert.match(home, /Learning Roadmaps/);
@@ -48,8 +48,28 @@ test("ships Cognora brand assets and public Google verification pages", async ()
 });
 
 test("uses the CognoraAI name on the public landing page", async () => {
-  const home = await read("app/page.tsx");
+  const [home, layout, manifest, privacy, terms] = await Promise.all([
+    read("app/page.tsx"),
+    read("app/layout.tsx"),
+    read("app/manifest.ts"),
+    read("app/privacy/page.tsx"),
+    read("app/terms/page.tsx"),
+  ]);
 
   assert.match(home, /<strong>CognoraAI<\/strong>/);
   assert.doesNotMatch(home, /<strong>Cognora<\/strong>/);
+  assert.match(layout, /applicationName: "CognoraAI"/);
+  assert.match(manifest, /short_name: "CognoraAI"/);
+  assert.doesNotMatch([home, layout, manifest, privacy, terms].join("\n"), /Cognora AI/);
+});
+
+test("explains CognoraAI and its Google Calendar data use without requiring login", async () => {
+  const home = await read("app/page.tsx");
+
+  assert.match(home, /CognoraAI is an AI-powered learning platform for students/);
+  assert.match(home, /Why CognoraAI requests Google Calendar data/);
+  assert.match(home, /Google Calendar access is optional/);
+  assert.match(home, /create, update, and synchronize/);
+  assert.match(home, /Google user data is not used for/);
+  assert.match(home, /href="\/privacy"/);
 });

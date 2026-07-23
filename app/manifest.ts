@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Cognora AI Learning Workspace",
-    short_name: "Cognora",
+    name: "CognoraAI Learning Workspace",
+    short_name: "CognoraAI",
     description: "Plan, learn, practice, and understand in one private AI learning workspace.",
     start_url: "/",
     display: "standalone",
