@@ -1,8 +1,10 @@
 "use client";
 
 import { ArrowRight, BookOpen, BrainCircuit, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
+import { CognoraLogo } from "@/components/brand/cognora-logo";
 import { useAuth } from "./auth-provider";
 
 type Mode = "signin" | "register";
@@ -36,13 +38,13 @@ export function AuthScreen() {
   return (
     <main className="auth-page">
       <section className="auth-story">
-        <a className="auth-brand" href="#top" aria-label="Cognora home">
-          <span className="brand-mark">C</span>
+        <Link className="auth-brand" href="/" aria-label="Cognora home">
+          <CognoraLogo />
           <span>
             <strong>Cognora</strong>
             <small>Learning intelligence</small>
           </span>
-        </a>
+        </Link>
         <div className="auth-story-copy">
           <p className="auth-eyebrow"><Sparkles size={15} /> Your learning, finally connected</p>
           <h1>One place to plan, learn, practice, and improve.</h1>
@@ -67,7 +69,7 @@ export function AuthScreen() {
       <section className="auth-form-panel">
         <div className="auth-form-wrap">
           <div className="auth-mobile-brand">
-            <span className="brand-mark">C</span>
+            <CognoraLogo />
             <strong>Cognora</strong>
           </div>
           <p className="eyebrow">{mode === "signin" ? "Welcome back" : "Create your workspace"}</p>
@@ -131,7 +133,10 @@ export function AuthScreen() {
             </button>
           </form>
 
-          <p className="auth-legal">By continuing, you agree to use AI feedback as learning guidance, not official grading.</p>
+          <p className="auth-legal">
+            By continuing, you agree to use AI feedback as learning guidance, not official grading,
+            and accept our <Link href="/terms">Terms of Service</Link> and <Link href="/privacy">Privacy Policy</Link>.
+          </p>
         </div>
       </section>
     </main>

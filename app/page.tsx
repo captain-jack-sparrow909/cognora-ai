@@ -32,6 +32,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { OnboardingScreen } from "@/components/auth/onboarding-screen";
 import { useAuth } from "@/components/auth/auth-provider";
+import { CognoraLogo } from "@/components/brand/cognora-logo";
 import { ActivityCenter, SettingsWorkspace } from "@/components/operations/operations-workspaces";
 import { PwaInstallButton } from "@/components/operations/pwa-install-button";
 import { trackProductEvent } from "@/lib/appwrite/product-analytics";
@@ -150,9 +151,7 @@ export default function Home() {
       <a className="skip-link" href="#main-workspace">Skip to workspace</a>
       <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
         <div className="brand-row">
-          <div className="brand-mark" aria-hidden="true">
-            C
-          </div>
+          <CognoraLogo />
           <div>
             <div className="brand-name">Cognora</div>
             <div className="brand-caption">Learning intelligence</div>
@@ -523,7 +522,7 @@ export default function Home() {
 function AppLoading() {
   return (
     <main className="app-loading">
-      <span className="brand-mark">C</span>
+      <CognoraLogo size={48} />
       <LoaderCircle className="spin" size={21} />
       <p>Connecting your learning workspace…</p>
     </main>

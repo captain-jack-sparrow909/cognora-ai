@@ -3,6 +3,7 @@
 import { ArrowRight, Check, Clock3, GraduationCap, LoaderCircle, Sparkles, Target } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { getAppwriteErrorMessage } from "@/lib/appwrite/errors";
+import { CognoraLogo } from "@/components/brand/cognora-logo";
 import type { StudyLevel } from "@/lib/appwrite/models";
 import { useAuth } from "./auth-provider";
 
@@ -46,7 +47,7 @@ export function OnboardingScreen() {
     <main className="onboarding-page">
       <header className="onboarding-header">
         <div className="auth-brand dark">
-          <span className="brand-mark">C</span>
+          <CognoraLogo />
           <span><strong>Cognora</strong><small>Learning intelligence</small></span>
         </div>
         <div className="onboarding-progress"><span>1</span><i /><span className="muted">2</span></div>

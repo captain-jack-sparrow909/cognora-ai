@@ -9,6 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#f4f1e9",
     theme_color: "#10233c",
-    icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
+    icons: [
+      { src: "/brand/cognora-app-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/brand/cognora-logo-google.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    ],
   };
 }

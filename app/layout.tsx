@@ -19,16 +19,23 @@ export async function generateMetadata(): Promise<Metadata> {
     applicationName: "Cognora AI",
     themeColor: "#10233c",
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Cognora" },
+    icons: {
+      icon: [
+        { url: "/brand/cognora-favicon-32.png", sizes: "32x32", type: "image/png" },
+        { url: "/brand/cognora-favicon-64.png", sizes: "64x64", type: "image/png" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
     openGraph: {
       title: "Cognora AI",
-      description: "Providers must prove they are ready.",
+      description: "Your learning, finally connected.",
       type: "website",
-      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "Cognora AI production provider verification gates" }],
+      images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "Cognora AI — Your learning, finally connected" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Cognora AI",
-      description: "Providers must prove they are ready.",
+      description: "Your learning, finally connected.",
       images: [`${origin}/og.png`],
     },
   };
